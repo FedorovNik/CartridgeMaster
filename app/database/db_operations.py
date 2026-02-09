@@ -93,51 +93,47 @@ async def user_exists(telegram_id: int):
 # Обновляет количество картриджа с штрихкодом `model` на `change` (плюс/минус).
 # Если картридж найден — возвращает кортеж (model, short_name, new_quantity).
 # Если не найден — возвращает строку со спец сигналом и  переданным штрихкодом `model`.
-async def update_cartridge(model: str, change: int) -> Union[Tuple[str, str, int], str]:
-
+async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
     async with aiosqlite.connect(DB_PATH) as db:
-        # Проверяем, есть ли такой картридж
-        async with db.execute("SELECT quantity, short_name FROM cartridges WHERE model = ?", (model,)) as cursor:
+        # Ищем картридж, связанный с этим штрихкодом
+        sql_select = """
+            SELECT c.id, c.cartridge_name, c.quantity 
+            FROM cartridges c
+            JOIN barcodes b ON c.id = b.cartridge_id
+            WHERE b.barcode = ?
+        """
+        async with db.execute(sql_select, (barcode,)) as cursor:
             row = await cursor.fetchone()
-            if row:
-                current_qty = row[0]
-                short_name = row[1]
-                # Если пытаются уменьшить, но уже 0 — не уменьшаем и возвращаем специальный код
-                if change < 0 and current_qty <= 0:
-                    # Специальный сигнал: недостаточно на складе
-                    return f"NO_STOCK:{model}"
+            
+        if not row:
+            return f"NOT_FOUND:{barcode}"
 
-                new_qty = max(0, current_qty + change)
+        c_id, name, current_qty = row
+        new_qty = current_qty + change
 
-                # Берем текущее время для записи для обновления записей в таблицах
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 2. Проверка на отрицательный остаток
+        if new_qty < 0:
+            return f"NO_STOCK:{name}"
 
-                # Обновление количества и временной метки в таблице картриджей
-                await db.execute(
-                    "UPDATE cartridges SET quantity = ?, last_updated = ? WHERE model = ?",
-                    (new_qty, current_time, model),
-                )
+        # Берем текущее время для записи для обновления записей в таблицах
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Обновляем количество и время последнего обновления в основной таблице
+        await db.execute(
+            "UPDATE cartridges SET quantity = ?, last_update = ? WHERE id = ?",
+            (new_qty, current_time, c_id)
+        )
 
-                # Обновление базы с логами для будущих прогнозов расходов. 
-                # Попробуем скормить нейронке эти записи
-                # Переменная action_type просто кратко хранит информацию 
-                # о типе операции - приход или расход.
-                # А обновляемое количество update_quantity хранится в базе по модулю  
-                action_type: bool
-                if change >= 0:
-                    action_type = 1
-                else:
-                    action_type = 0
-                await db.execute("""
-                    INSERT OR IGNORE INTO cart_update_log (model, action_type, update_quantity, balance, last_updated ) VALUES (?, ?, ?, ?, ?)
-                    """, 
-                    (model, action_type, abs(change), new_qty, current_time )
-                )
-                await db.commit()
-                return model, short_name, new_qty
-            else:
-                # Возвращаем строку со штрихкодом если не найден
-                return f"NOT_FOUND:{model}"
+        # Логируем историю об операции в таблицу (action_type: 1 если приход/ноль, 0 если расход)
+        action_type = 1 if change >= 0 else 0
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        await db.execute("""
+            INSERT INTO update_history (barcode, action_type, update_quantity, balance, update_time)
+            VALUES (?, ?, ?, ?, ?)
+        """, (barcode, action_type, abs(change), new_qty, current_time)
+        )
+
+        await db.commit()
+        return new_qty, name
 
 # Просто выборка по всем картриджам из всех базы
 async def get_all_cartridges():

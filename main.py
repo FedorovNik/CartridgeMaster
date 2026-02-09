@@ -62,7 +62,7 @@ async def main():
 
 
     ########################### ЗАПУСК ПУЛИНГА БОТА И ОБРАБОТКА СИГНАЛОВ ОСТАНОВКИ ##########################
-    logger.info(f"Выполняется инициализация пулинга бота...")
+    
     # Создаем event для остановки
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
@@ -73,27 +73,37 @@ async def main():
 
     # Попытаемся зарегистрировать обработчики сигналов — на винде add_signal_handler может быть не реализован
     for sig in (signal.SIGINT, signal.SIGTERM):
+
+        # Регистрируем нормальный обработчик сигнала для корректной остановки сервера и бота при получении SIGINT (Ctrl+C) или SIGTERM
+        # Выполнится на линухе нормально.
         try:
             loop.add_signal_handler(sig, _on_stop)
-        except NotImplementedError:
-            # fallback: обычный signal.signal для платформ где add_signal_handler недоступен
-            signal.signal(sig, lambda s, f: _on_stop())
+            logger.info(f"Регистрация обработчика сигнала останова {sig.name} ({sig.value}) завершена.")
 
+        # Если платформа (Windows!!!!!) не поддерживает add_signal_handler, то надо ловить исключение NotImplementedError и использовать signal.signal
+        # питон на Windows лишь имитирует поведение сигналов, костыль не идеальный, но лучше чем ничего. 
+        # На практике это означает, что при нажатии Ctrl+C будет вызван обработчик _on_stop, который запустит процедуру корректной остановки.
+        except NotImplementedError:
+            signal.signal(sig, lambda s, f: _on_stop())
+            logger.info(f"Регистрация обработчика сигнала останова {sig.name} ({sig.value}) завершена.")
+
+    
     # Запускаем polling в фоне и запрещаем aiogram регистрировать сигналы,
-    # иначе миллион исключений при попытке поймать сигнал остановки
+    # Иначе миллион исключений при попытке поймать сигнал остановки
     polling_task = asyncio.create_task(dp.start_polling(bot, handle_signals=False))
 
     try:
-        # Ждем сигнала остановки
+        # Ожидание сигнала остановки
         await stop_event.wait()
         logger.info("Выполняется запрос диспетчеру на корректную остановку пулинга.")
-        # Попросим диспетчер корректно остановить пулинг
+        # Просим диспетчер корректно остановить пулинг
         try:
             await dp.stop_polling()
         except Exception:
             logger.exception("Ошибка при вызове метода диспетчера stop_polling!")
 
-        # Дождемся завершения фонового таска
+        # Ожидание завершения фонового таска пулинга, с обработкой исключения CancelledError,
+        # которое будет выброшено при остановке пулинга.
         try:
             await polling_task
         except asyncio.CancelledError:

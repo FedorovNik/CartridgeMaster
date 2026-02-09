@@ -16,7 +16,7 @@ hostname = socket.gethostname()
 local_ip = socket.gethostbyname(hostname)
 
 
-
+logger = logging.getLogger(__name__)
 
 def is_number(s):
     try:
@@ -246,71 +246,64 @@ async def notice(message: Message, command: CommandObject):
 # Аналогичная функция по функционалу (как и в случае с ТСД) для обновления позиции количества картриджа в базе. 
 # Надо потом как нибудь переделать покрасивее  
 @rt.message(Command("renew"))
-async def add_cart(message: Message, command: CommandObject,bot:Bot):
-    #from main import bot
+async def renew(message: Message, command: CommandObject, bot:Bot):
+    
     if not command.args:
         return await message.answer("Команда обновления количества картриджей в базе требует аргументов.\n"
-                                "<b>/renew SHTRIH_CODE QUANTITY</b>\n"
-                                "Параметр SHTRIH_CODE принимает только штрих-код картриджа.\nПосмотреть все можно выведя список /list\n"
-                                "Параметр QUANTITY принимает положительные и отрицательные значения от 0 до 30.\n"
+                                "<b>/renew BARCODE CHANGE</b>\n"
+                                "Параметр BARCODE принимает только штрих-код картриджа.\nПосмотреть все можно выведя список /list\n"
+                                "Параметр CHANGE принимает положительные и отрицательные значения от 0 до 30.\n"
                                 "Он определяет количество добавляемых картриджей в базу.\n\n"
                                 "Пример синтаксиса для добавления 2 шт картриджа TL-420:\n"
                                 "<b>/renew 123456789123 +2</b>\n",
                                 parse_mode="HTML")
 
-    # Проверка кол-ва аргументов, ожидается только ID(цифровая) и BOOL(булевая)
+    # Нам нужно только два аргумента
     parts = command.args.split(maxsplit=1)
     if len(parts) != 2:
-        return await message.answer("Неверное количество аргументво команды!")
-    cart_id, quantity = parts
+        return await message.answer("Неверное количество аргументов команды!")
+    barcode, change = parts
     
-    # Проверка на число
-    if not cart_id.isdigit():
+    # Простые проверки аргументов
+    if not barcode.isdigit():
         return await message.answer("Штрих-код должен состоять только из цифр!")
-
-    if not is_number(quantity) or not(-30 <= int(quantity) <= 30):
-        return await message.answer("Количество должно состоять только из цифр -30 до +30!")
+    if not is_number(change):
+        return await message.answer("Количество должно быть числом!")
+    if not(-15 <= int(change) <= 15):
+        return await message.answer("Количество должно быть от -15 до 15!")
+    if int(change) == 0:
+        return await message.answer("Какой в этом смысл?")
+    
 
     # Список айдишек для отправки сообщений пользователям в тг
     user_ids = await get_tg_id_list_notification()    
+    # Вызываем функцию базы
+    # Она вернет либо кортеж (новое_количество, имя_картриджа), либо совмещенную строку с именем и сигналом вида NOT_FOUND NO_STOCK
+    db_operation_res = await update_cartridge(int(barcode), int(change))
 
-    db_operation_res = await update_cartridge(int(cart_id), int(quantity))
-    #print(db_operation_res)
-
-    # Обрабатываем результат: если вернулся кортеж (model, short_name, quantity) — лог и ответ в тг
-    if isinstance(db_operation_res, tuple) and len(db_operation_res) == 3:
-        model_res, short_name_res, new_qty = db_operation_res
-        logging.info(f"Операция c БД: Код={model_res}, Короткое_имя={short_name_res}, Количество={new_qty}")
-        
-
-        # Отправляем уведомление response_text в Telegram о успешном обновлении
-        response_text = f"Штрих-код: {model_res}\nНаименование: {short_name_res}\nНовое количество: {new_qty}"
+    # Отправляем уведомление в тг и логируем как инфо
+    if isinstance(db_operation_res, tuple) and len(db_operation_res) == 2:
+        balance, cartridge_name = db_operation_res
+        logger.info(f"TELEGRAM - обновлена БД | Штрих-код={barcode} | Имя={cartridge_name} | Количество={balance}")
         for user_id in user_ids:
-            return await bot.send_message(chat_id=user_id, text=f"{response_text}")
+            return await bot.send_message(chat_id=user_id, text=f"Штрих-код: {barcode}\nНаименование: {cartridge_name}\nНовое количество: {balance}")
         
 
-    # Если вернулась строка — это сигналы вида NOT_FOUND:model или NO_STOCK:model
+    # Если вернулась строка — это сигналы вида NOT_FOUND:BARCODE или NO_STOCK:CARTRIDGE_NAME
+    # В обоих вариантах отправляем уведомление в тг и логируем как предупреждение
     if isinstance(db_operation_res, str):
+        barcode_or_name = db_operation_res.split(":", 1)[1]
         if db_operation_res.startswith("NOT_FOUND:"):
-            # Отрезаем кусок NOT_FOUND: от полученной строки для лога и тг ответа
-            barcode_not_found = db_operation_res.split(":", 1)[1]
-            logging.info(f"Операция c БД, не найден штрих-код: {barcode_not_found}")
-
-            response_text = f"Нет в базе: {barcode_not_found}"
+            logger.warning(f"TELEGRAM - не обновлена БД | Не найден штрих-код: {barcode_or_name}")
             for user_id in user_ids:
-                return await bot.send_message(chat_id=user_id, text=f"Штрих-код: {cart_id}\n{response_text}")
-            
-
+                return await bot.send_message(chat_id=user_id, text=f"Операция не выполнена!\nШтрих-кода нет в базе: {barcode_or_name}")
+        
         if db_operation_res.startswith("NO_STOCK:"):
-            # Отрезаем кусок NO_STOCK: от полученной строки для лога и тг ответа
-            barcode_no_stock = db_operation_res.split(":", 1)[1]
-            logging.info(f"Операция ТСД - попытка обновления БД, нет на складе: {barcode_no_stock}")
-
-            response_text = f"Нет на складе: {barcode_no_stock}"
+            logger.warning(f"TELEGRAM - не обновлена БД | Нет на складе или не останется после операции: {barcode_or_name}")
             for user_id in user_ids:
-                return await bot.send_message(chat_id=user_id, text=f"Штрих-код: {cart_id}\n{response_text}")
+                return await bot.send_message(chat_id=user_id, text=f"Операция не выполнена!\nНет на складе или не останется после операции.\nНаименование: {barcode_or_name}")
             
     # Любой другой вариант  — возвращаем 400
-    logging.warning(f"Операция ТСД - неожиданный ответ от БД: {db_operation_res}")
-    response_text = "Неожиданный ответ от БД"
-    await bot.send_message(539356755, f"Штрих-код: {cart_id}\n{response_text}")
+    logger.error(f"TELEGRAM - ошибка функции БД | Неожиданный ответ от update_cartridge(): {db_operation_res}")
+    for user_id in user_ids:
+        return await bot.send_message(chat_id=user_id, text=f"Неожиданный ответ от БД!\n{db_operation_res}")
