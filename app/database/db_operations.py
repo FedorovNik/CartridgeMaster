@@ -7,6 +7,7 @@ DB_PATH = "database.db"
 
 async def create_tables():
     async with aiosqlite.connect(DB_PATH) as db:
+        # Таблица пользователей, в которой хранятся TG-ID, имя и статус уведомлений
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,23 +16,33 @@ async def create_tables():
                 notice_enabled BOOLEAN DEFAULT 0
             )
         """)
+        # Таблица картриджей, у каждой модели уникальный ID, количество и время последнего обновления
         await db.execute("""
             CREATE TABLE IF NOT EXISTS cartridges (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                model TEXT,
-                short_name TEXT,
+                cartridge_name TEXT,
                 quantity INTEGER,
-                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+                last_update DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Таблица для связи штрихкода и картриджа, так как у взаимозаменяемых катриджей могут быть разные баркоды.
+        # Нет смысла хранить их в разных строках, так как по факту это один и тот же картридж. 
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS cart_update_log (
+            CREATE TABLE IF NOT EXISTS barcodes (
+                barcode TEXT PRIMARY KEY,
+                cartridge_id INTEGER,
+                FOREIGN KEY (cartridge_id) REFERENCES cartridges (id)
+            )
+        """)
+        # Таблица истории изменений количества картриджей, для будущих прогнозов и аналитики.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS update_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                model TEXT,
+                barcode TEXT,
                 action_type BOOLEAN,
                 update_quantity INTEGER,
                 balance INTEGER,
-                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+                update_time DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
         await db.commit()
