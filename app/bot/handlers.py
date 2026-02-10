@@ -177,7 +177,7 @@ async def list_users(message: Message):
 @rt.message(Command("list"))
 async def list_cartridges(message: Message):
     cartridges = await get_all_cartridges()
-    
+    logger.info(cartridges)
     if not cartridges:
         return await message.answer("Склад пуст. Картриджи не найдены.", parse_mode="HTML")
 
@@ -190,7 +190,7 @@ async def list_cartridges(message: Message):
         display_name = (short_name[:15] + '..') if len(short_name) > 15 else short_name
         # Индикатор остатка
         status_color = ""
-        if qty >= 5:
+        if qty >= 6:
             status_color = "✅ Достаточно"
         elif qty >= 3:
             status_color = "⚠️ Средне"

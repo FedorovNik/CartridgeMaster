@@ -135,10 +135,14 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
         await db.commit()
         return new_qty, name
 
-# Просто выборка по всем картриджам из всех базы
+# Выборка по всем картриджам из всех базы
 async def get_all_cartridges():
     async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT model, short_name, quantity, last_updated FROM cartridges") as cursor:
+        sql_select ="""
+        SELECT
+            всё херня надо переделать!!!
+        """
+        async with db.execute(sql_select, ()) as cursor:
             return await cursor.fetchall()
         
 # Обновляет параметр notice_enabled в базе пользователей, для включения/отключения уведомлений.
