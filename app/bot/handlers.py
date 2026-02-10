@@ -275,35 +275,61 @@ async def renew(message: Message, command: CommandObject, bot:Bot):
         return await message.answer("Какой в этом смысл?")
     
 
-    # Список айдишек для отправки сообщений пользователям в тг
-    user_ids = await get_tg_id_list_notification()    
-    # Вызываем функцию базы
-    # Она вернет либо кортеж (новое_количество, имя_картриджа), либо совмещенную строку с именем и сигналом вида NOT_FOUND NO_STOCK
-    db_operation_res = await update_cartridge(int(barcode), int(change))
+    # Список айдишек для метода бота send_message
+    user_ids = await get_tg_id_list_notification()
 
-    # Отправляем уведомление в тг и логируем как инфо
+    # Заготовка текста для answer
+    msg_text = f"TG_ID: {message.message_id}"
+
+    # Вызываем функцию базы
+    db_operation_res = await update_cartridge(int(barcode), int(change))
+    
+    # Обработка db_operation_res
+    # Если вернулся кортеж из (new_qty, name)
+    # Отправляем уведомление в тг ВСЕМ кто в рассылке и логируем как инфо
     if isinstance(db_operation_res, tuple) and len(db_operation_res) == 2:
         balance, cartridge_name = db_operation_res
         logger.info(f"TELEGRAM - обновлена БД | Штрих-код={barcode} | Имя={cartridge_name} | Количество={balance}")
         for user_id in user_ids:
             return await bot.send_message(chat_id=user_id, text=f"Штрих-код: {barcode}\nНаименование: {cartridge_name}\nНовое количество: {balance}")
         
-
-    # Если вернулась строка — это сигналы вида NOT_FOUND:BARCODE или NO_STOCK:CARTRIDGE_NAME
-    # В обоих вариантах отправляем уведомление в тг и логируем как предупреждение
-    if isinstance(db_operation_res, str):
+    # Обработка db_operation_res
+    # Если вернулась строка: NOT_FOUND:BARCODE или NO_STOCK:CARTRIDGE_NAME
+    # Отправляем ОТВЕТ в тг и логируем как предупреждение
+    elif isinstance(db_operation_res, str):
         barcode_or_name = db_operation_res.split(":", 1)[1]
-        if db_operation_res.startswith("NOT_FOUND:"):
-            logger.warning(f"TELEGRAM - не обновлена БД | Не найден штрих-код: {barcode_or_name}")
-            for user_id in user_ids:
-                return await bot.send_message(chat_id=user_id, text=f"Операция не выполнена!\nШтрих-кода нет в базе: {barcode_or_name}")
         
+        # Если не найден картридж по штриху в базе отправляем в лог и в тг-ответ
+        if db_operation_res.startswith("NOT_FOUND:"):
+            logger.warning(f"TELEGRAM | Не обновлена БД | Не найден штрих-код: {barcode_or_name}")
+            # Если не ушел ответ тоже логируем
+            try:
+                await message.answer(f"Операция не выполнена!\
+                                     \nПричина: нет в базе.\
+                                     \nШтрих-код: {barcode_or_name}")
+            except Exception as e:
+                logger.warning(f"TELEGRAM | Не доставлено | "+ msg_text)
+                return None
+            logger.info(f"TELEGRAM | Доставлено | " + msg_text)
+            return
+        
+        # Если не получилось изменить количество в базе отправляем в лог и в тг-ответ
         if db_operation_res.startswith("NO_STOCK:"):
-            logger.warning(f"TELEGRAM - не обновлена БД | Нет на складе или не останется после операции: {barcode_or_name}")
-            for user_id in user_ids:
-                return await bot.send_message(chat_id=user_id, text=f"Операция не выполнена!\nНет на складе или не останется после операции.\nНаименование: {barcode_or_name}")
-            
-    # Любой другой вариант  — возвращаем 400
-    logger.error(f"TELEGRAM - ошибка функции БД | Неожиданный ответ от update_cartridge(): {db_operation_res}")
-    for user_id in user_ids:
-        return await bot.send_message(chat_id=user_id, text=f"Неожиданный ответ от БД!\n{db_operation_res}")
+            logger.warning(f"TELEGRAM | Не обновлена БД | Нет на складе или отрицательное количество после операции: {barcode_or_name}")
+            # Если не ушел ответ тоже логируем
+            try:
+                await message.answer(f"Операция не выполнена!\
+                                     \nНаименование: {barcode_or_name} \
+                                     \nПричина: нет на складе или не останется после выполнения этой операции.\
+                                    ")
+            except Exception as e:
+                logger.warning(f"TELEGRAM | Не доставлено | "+ msg_text)
+                return None
+            logger.info(f"TELEGRAM | Доставлено | "+ msg_text)
+            return
+
+    # Любой другой вариант это косяк update_cartridge()  — возвращаем 400
+    else:       
+        logger.error(f"TELEGRAM | Ошибка функции БД | Вернула неожиданный результат: {db_operation_res}")
+        for user_id in user_ids:
+            return await bot.send_message(chat_id=user_id, text=f"Неожиданный ответ от БД!\n{db_operation_res}")
