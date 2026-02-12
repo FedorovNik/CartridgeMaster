@@ -139,8 +139,9 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
 async def get_all_cartridges():
     async with aiosqlite.connect(DB_PATH) as db:
         sql_select ="""
-        SELECT
-            всё херня надо переделать!!!
+            SELECT c.id, c.cartridge_name, c.quantity, group_concat(b.barcode, '; ') as all_barcodes, c.last_update
+            FROM barcodes b LEFT JOIN cartridges as c ON c.id == b.cartridge_id
+            GROUP by b.cartridge_id
         """
         async with db.execute(sql_select, ()) as cursor:
             return await cursor.fetchall()
