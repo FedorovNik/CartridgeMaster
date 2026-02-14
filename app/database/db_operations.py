@@ -1,9 +1,10 @@
 import aiosqlite
 from typing import Optional, Tuple, Union
 from datetime import datetime
+import logging
 
 DB_PATH = "database.db"
-
+logger = logging.getLogger(__name__)
 
 async def create_tables():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -102,9 +103,10 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
             JOIN barcodes b ON c.id = b.cartridge_id
             WHERE b.barcode = ?
         """
+         
         async with db.execute(sql_select, (barcode,)) as cursor:
             row = await cursor.fetchone()
-            
+        logger.info(row)
         if not row:
             return f"NOT_FOUND:{barcode}"
 
