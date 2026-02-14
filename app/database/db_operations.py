@@ -91,33 +91,36 @@ async def user_exists(telegram_id: int):
             return result is not None
             # fetchone() передвигает указатель курсора при вызове!
 
-# Обновляет количество картриджа с штрихкодом `model` на `change` (плюс/минус).
-# Если картридж найден — возвращает кортеж (model, short_name, new_quantity).
-# Если не найден — возвращает строку со спец сигналом и  переданным штрихкодом `model`.
+# Обновляет количество картриджа с штрихкодом `barcode` на `change`.
+# Если barcode найден — возвращает кортеж (new_qty, name).
+# Если barcode не найден — возвращает строку NOT_FOUND:barcode_or_name"
 async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
     async with aiosqlite.connect(DB_PATH) as db:
-        # Ищем картридж, связанный с этим штрихкодом
+        # Ищем картридж в cartridges, связанный с этим штрихкодом из таблицы barcodes
         sql_select = """
             SELECT c.id, c.cartridge_name, c.quantity 
             FROM cartridges c
             JOIN barcodes b ON c.id = b.cartridge_id
             WHERE b.barcode = ?
         """
-         
         async with db.execute(sql_select, (barcode,)) as cursor:
             row = await cursor.fetchone()
-        logger.info(row)
+
+        # Если не ничего не нашли, выходим с сигналом NOT_FOUND
         if not row:
             return f"NOT_FOUND:{barcode}"
 
+        # После выполнения запроса заносим данные из кортежа в переменные и вычисляем новое количество
         c_id, name, current_qty = row
         new_qty = current_qty + change
-
-        # 2. Проверка на отрицательный остаток
+        # Проверка на отрицательный остаток
+        # Если после предыдущего вычисления вышло меньше нуля, выходим с сигналом NO_STOCK
         if new_qty < 0:
             return f"NO_STOCK:{name}"
 
         # Берем текущее время для записи для обновления записей в таблицах
+        # Встроенный current_timestamp sqlite дает не то время, лень разбираться.
+        # Разница в пару милисекунд несущественна, так что просто генерируем время на стороне питона.
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # Обновляем количество и время последнего обновления в основной таблице
         await db.execute(
@@ -133,11 +136,11 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
             VALUES (?, ?, ?, ?, ?)
         """, (barcode, action_type, abs(change), new_qty, current_time)
         )
-
         await db.commit()
         return new_qty, name
 
-# Выборка по всем картриджам из всех базы
+# Выборка по всем картриджам из всех базы,
+# Вовзращает кортеж (id, cartridge_name, quantity, all_barcodes, last_update) по каждому айдишнику.
 async def get_all_cartridges():
     async with aiosqlite.connect(DB_PATH) as db:
         sql_select ="""
@@ -155,15 +158,3 @@ async def update_user_notice(telegram_id: int, notice_enabled: int):
                     "UPDATE users SET notice_enabled = ? WHERE telegram_id = ?",(notice_enabled, telegram_id)
                 )
         await db.commit()
-
-# Просто проверяет наличие в базе
-#async def cartridge_exist(telegram_id: int) -> bool:
-#    async with aiosqlite.connect(DB_PATH) as db:
-#        async with db.execute("SELECT 1 FROM cartridges WHERE model = ?", (telegram_id,)) as cursor:
-#            result = await cursor.fetchone()
-#            return result is not None
-
-
-
-
-
