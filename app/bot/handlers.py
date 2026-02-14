@@ -208,7 +208,7 @@ async def list_cartridges(message: Message):
             status_color = "❌ Мало!  "
         else:
             # Если количество отрицательное, то это косяк в базе, который нужно исправить
-            logger.error(f"TELEGRAM | /list | Отрицательное количество по позиции | ID: {id} Наименование: {cartridge_name} Количество: {quantity}")
+            logger.error(f"| TELEGRAM | /list | Отрицательное количество по позиции | ID: {id} Наименование: {cartridge_name} Количество: {quantity}")
             return message.answer(f"В базе отрицательное количество!\nID:{id}\nШтрих-коды:{all_barcodes}\nНаименование:{cartridge_name}\nКоличество:{quantity}")
         
         # Фромируем строку для каждого картриджа
@@ -309,13 +309,13 @@ async def renew(message: Message, command: CommandObject, bot:Bot):
     # Отправляем уведомление в тг ВСЕМ кто в рассылке и логируем как инфо
     if isinstance(db_operation_res, tuple) and len(db_operation_res) == 2:
         balance, cartridge_name = db_operation_res
-        logger.info(f"TELEGRAM |   Обновлена БД  | Штрих-код: {barcode} | Имя: {cartridge_name} | Количество: {balance}")
+        logger.info(f"| TELEGRAM |   Обновлена БД  | Штрих-код: {barcode} | Имя: {cartridge_name} | Количество: {balance}")
         for user_id in user_ids:
             try:
                 await bot.send_message(chat_id=user_id, text=f"База обновлена.\nШтрих-код: {barcode}\nНаименование: {cartridge_name}\nНовое количество: {balance}")
-                logger.info(f"TELEGRAM |    Доставлено   | " + msg_text)
+                logger.info(f"| TELEGRAM |    Доставлено   | " + msg_text)
             except Exception as e:
-                logger.warning(f"TELEGRAM |  Не доставлено  | "+ msg_text)
+                logger.warning(f"| TELEGRAM |  Не доставлено  | "+ msg_text)
                 return None
             return
         
@@ -327,21 +327,21 @@ async def renew(message: Message, command: CommandObject, bot:Bot):
         
         # Если не найден картридж по штриху в базе отправляем в лог и в тг-ответ
         if db_operation_res.startswith("NOT_FOUND:"):
-            logger.warning(f"TELEGRAM | Не обновлена БД | Не найден штрих-код: {barcode_or_name}")
+            logger.warning(f"| TELEGRAM | Не обновлена БД | Не найден штрих-код: {barcode_or_name}")
             # Если не ушел ответ тоже логируем
             try:
                 await message.answer(f"Операция не выполнена!\
                                      \nПричина: нет в базе.\
                                      \nШтрих-код: {barcode_or_name}")
             except Exception as e:
-                logger.warning(f"TELEGRAM | Не доставлено | "+ msg_text)
+                logger.warning(f"| TELEGRAM | Не доставлено | "+ msg_text)
                 return None
-            logger.info(f"TELEGRAM |    Доставлено   | " + msg_text)
+            logger.info(f"| TELEGRAM |    Доставлено   | " + msg_text)
             return
         
         # Если не получилось изменить количество в базе отправляем в лог и в тг-ответ
         if db_operation_res.startswith("NO_STOCK:"):
-            logger.warning(f"TELEGRAM | Не обновлена БД | Нет на складе или отрицательное количество: {barcode_or_name}")
+            logger.warning(f"| TELEGRAM | Не обновлена БД | Нет на складе или отрицательное количество: {barcode_or_name}")
             # Если не ушел ответ тоже логируем
             try:
                 await message.answer(f"Операция не выполнена!\
@@ -349,13 +349,13 @@ async def renew(message: Message, command: CommandObject, bot:Bot):
                                      \nПричина: нет на складе или не останется после выполнения.\
                                     ")
             except Exception as e:
-                logger.warning(f"TELEGRAM | Не доставлено | "+ msg_text)
+                logger.warning(f"| TELEGRAM | Не доставлено | "+ msg_text)
                 return None
-            logger.info(f"TELEGRAM |    Доставлено   | "+ msg_text)
+            logger.info(f"| TELEGRAM |    Доставлено   | "+ msg_text)
             return
 
     # Любой другой вариант это косяк update_cartridge()  — возвращаем 400
     else:       
-        logger.error(f"TELEGRAM | Ошибка БД | Вернула неожиданный результат: {db_operation_res}")
+        logger.error(f"| TELEGRAM | Ошибка БД | Вернула неожиданный результат: {db_operation_res}")
         for user_id in user_ids:
             return await bot.send_message(chat_id=user_id, text=f"Неожиданный ответ от БД!\n{db_operation_res}")
