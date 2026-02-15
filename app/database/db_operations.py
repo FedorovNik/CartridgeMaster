@@ -202,3 +202,33 @@ async def update_user_notice(telegram_id: int, notice_enabled: int):
         """
         await db.execute(sql_req, (notice_enabled, telegram_id) )
         await db.commit()
+
+# 
+async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # запрос на вставку нового картриджа в cartridges
+            sql_req = """
+                    INSERT INTO cartridges (cartridge_name, quantity, last_update)
+                    VALUES (?, ?, ?)
+            """
+            # результат выполнения заносим в объект курсора, у него есть метод для получения ID последней записи
+            curs_res = await db.execute(sql_req, (cartridge_name, quantity, current_time) )
+            new_cartridge_id = curs_res.lastrowid
+
+            # запрос на вставку штрих кода и определенным ID картриджа в barcodes
+            sql_req2 = """
+                    INSERT INTO barcodes (barcode, cartridge_id)
+                    VALUES (?, ?)
+            """
+            await db.execute(sql_req2, (barcode, new_cartridge_id) )
+            await db.commit()
+
+            #logger.info(curs_res)
+            #return curs_res
+            return True
+        
+        except Exception as e:
+            logger.error(f"Ошибка при добавлении нового картриджа: {e}")
+            return None

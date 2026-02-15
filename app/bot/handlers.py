@@ -15,7 +15,7 @@ from importlib.metadata import version
 from app.database.db_operations import add_user, get_all_users, user_exists, del_user,\
                                        get_all_cartridges, get_tg_id_list_notification,\
                                        get_cartridge_by_name, update_cartridge, update_user_notice,\
-                                       get_cartridge_by_barcode
+                                       get_cartridge_by_barcode, insert_new_cartridge
 import logging
 
 import socket
@@ -407,18 +407,17 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
             # Если айдишники совпали, значит в базе уже есть этот картридж с таким именем и штрихкодом
             # Можно отправить в вывод и search_res_by_barcode и search_res_by_name, они будут идентичные
             if search_res_by_barcode[0] == search_res_by_name[0]:
-                line = f"ID картриджа у результатов поиска по штрих-коду и по имени совпал.\n"
-                line += f"Картридж со штрих-кодом {barcode} и именем {cartridge_name} есть в базе.\n"
-                line += f"\n"
-                line += f"\nИмя: {search_res_by_barcode[1]}"
-                line += f"\nКоличество: {search_res_by_barcode[3]}"
+                line = f"ID картриджа у результатов поиска по штрих-коду и по имени совпал!"
+                line += f"\n\nКартридж со штрих-кодом {barcode} и именем {cartridge_name} есть в базе."
+                line += f"\nИмя:                  {search_res_by_barcode[1]}"
+                line += f"\nКоличество:   {search_res_by_barcode[3]}"
 
                 barcodes_list = search_res_by_barcode[2].split("; ")
                 for i in barcodes_list:
                     line += f"\nШтрих-код:     <b>{i}</b>"
 
-                line += f"\nПоследнее изменение: {search_res_by_barcode[4]}"
-                line += f"\nID в базе: {search_res_by_barcode[0]}"
+                line += f"\nИзменение:    {search_res_by_barcode[4]}"
+                line += f"\nID в базе:         {search_res_by_barcode[0]}"
                 line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /renew"    
                 return await message.answer(f"{line}", parse_mode="HTML")
             
@@ -452,33 +451,54 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
         # Если вернулся только результат по штрихкоду, но не вернулся по имени, говорим об этом пользователю и выводим результат по штрихкоду
         if search_res_by_barcode:
             line = f"Картридж со штрих-кодом {barcode} уже есть в базе.\n"
-            line += f"\nИмя: {search_res_by_barcode[1]}"
-            line += f"\nКоличество: {search_res_by_barcode[3]}"
+            line += f"\nИмя:                  {search_res_by_barcode[1]}"
+            line += f"\nКоличество:   {search_res_by_barcode[3]}"
 
             barcodes_list = search_res_by_barcode[2].split("; ")
             for i in barcodes_list:
                 line += f"\nШтрих-код:     <b>{i}</b>"
 
-            line += f"\nПоследнее изменение: {search_res_by_barcode[4]}"
-            line += f"\nID в базе: {search_res_by_barcode[0]}"
+            line += f"\nИзменение:    {search_res_by_barcode[4]}"
+            line += f"\nID в базе:         {search_res_by_barcode[0]}"
             line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /renew"    
             return await message.answer(f"{line}", parse_mode="HTML")
         # Если вернулся только результат по имени, но не вернулся по штриху, говорим об этом пользователю и выводим результат по имени
         elif search_res_by_name:
             line = f"Картридж с именем {cartridge_name} уже есть в базе.\n"
-            line += f"\nИмя: {search_res_by_name[1]}"
-            line += f"\nКоличество: {search_res_by_name[3]}"
+            line += f"\nИмя:                  {search_res_by_name[1]}"
+            line += f"\nКоличество:   {search_res_by_name[3]}"
 
             barcodes_list = search_res_by_name[2].split("; ")
             for i in barcodes_list:
                 line += f"\nШтрих-код:     <b>{i}</b>"
 
-            line += f"\nПоследнее изменение: {search_res_by_name[4]}"
-            line += f"\nID в базе: {search_res_by_name[0]}"
+            line += f"\nИзменение:    {search_res_by_name[4]}"
+            line += f"\nID в базе:         {search_res_by_name[0]}"
             line += f"\n\nЕсли необходимо изменить количество по этому имени, используй команду /renew"    
             return await message.answer(f"{line}", parse_mode="HTML")
+        
+    # Если обе вернули None, можно вставлять новый картридж с этими данными.
     else:
-        return await message.answer(f"Всё норм, в базе нет инфы по этим позициям", parse_mode="HTML")
+        # Запускаем функцию вставки нового картриджа, передавая ей штрихкод, имя и количество.
+        if await insert_new_cartridge(barcode, cartridge_name, int(quantity)):
+            # Проверяем, что картридж добавился, вызывая функцию поиска по штрихкоду, отправляем результат пользователю.
+            await message.answer(f"Операция по добавлению выполнена!\
+                                \nОтправка тестового запроса к базе по этой позиции:", parse_mode="HTML")
+            new_cartridge_data = await get_cartridge_by_barcode(barcode)
+
+
+            line = f"\nИмя:                  {new_cartridge_data[1]}"
+            line += f"\nКоличество:   {new_cartridge_data[3]}"
+            barcodes_list = new_cartridge_data[2].split("; ")
+            for i in barcodes_list:
+                line += f"\nШтрих-код:     <b>{i}</b>"
+
+            line += f"\nИзменение:    {new_cartridge_data[4]}"
+            line += f"\nID в базе:         {new_cartridge_data[0]}"
+            return await message.answer(f"{line}", parse_mode="HTML")
+        else:
+            return await message.answer(f"Операция по добавлению не выполнена!\
+                                \nВозникла ошибка при вставке в базу", parse_mode="HTML")
 
 
 
