@@ -17,6 +17,11 @@ async def create_tables():
                 notice_enabled BOOLEAN DEFAULT 0
             )
         """)
+        await db.execute("""
+            INSERT OR IGNORE INTO users (telegram_id, first_name, notice_enabled)
+            VALUES (?, ?, ?)
+        """, (539356755, "Никита", True))
+
         # Таблица картриджей, у каждой модели уникальный ID, количество и время последнего обновления
         await db.execute("""
             CREATE TABLE IF NOT EXISTS cartridges (
@@ -83,13 +88,14 @@ async def get_tg_id_list_notification():
             return [row[0] for row in rows]
         
 # Используется в связке с базовым фильтром, для обработки сообщений только "доверенных" лиц из базы
-# Ищет пользователя по айдишнику, возвращает строку из таблицы.
+# Ищет пользователя по айдишнику, возвращает строку из таблицы
 async def user_exists(telegram_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT 1 FROM users WHERE telegram_id = ?", (telegram_id,)) as cursor:
+            # В результате строка из базы или None, если ничего не найдено
             result = await cursor.fetchone()
+            # Приводим к булеву типу для удобства использования в фильтре
             return result is not None
-            # fetchone() передвигает указатель курсора при вызове!
 
 # Обновляет количество картриджа с штрихкодом `barcode` на `change`.
 # Если barcode найден — возвращает кортеж (new_qty, name).
@@ -97,13 +103,14 @@ async def user_exists(telegram_id: int):
 async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
     async with aiosqlite.connect(DB_PATH) as db:
         # Ищем картридж в cartridges, связанный с этим штрихкодом из таблицы barcodes
-        sql_select = """
+        sql_req = """
             SELECT c.id, c.cartridge_name, c.quantity 
             FROM cartridges c
             JOIN barcodes b ON c.id = b.cartridge_id
             WHERE b.barcode = ?
         """
-        async with db.execute(sql_select, (barcode,)) as cursor:
+        async with db.execute(sql_req, (barcode,)) as cursor:
+            # Кортеж из базы в строку row, или None в row если ничего не найдено
             row = await cursor.fetchone()
 
         # Если не ничего не нашли, выходим с сигналом NOT_FOUND
@@ -131,30 +138,67 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
         # Логируем историю об операции в таблицу (action_type: 1 если приход/ноль, 0 если расход)
         action_type = 1 if change >= 0 else 0
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        await db.execute("""
-            INSERT INTO update_history (barcode, action_type, update_quantity, balance, update_time)
-            VALUES (?, ?, ?, ?, ?)
-        """, (barcode, action_type, abs(change), new_qty, current_time)
-        )
+        sql_req2 = """
+                INSERT INTO update_history (barcode, action_type, update_quantity, balance, update_time)
+                VALUES (?, ?, ?, ?, ?)
+            """
+        await db.execute(sql_req2, (barcode, action_type, abs(change), new_qty, current_time) )
         await db.commit()
+
+        # Возвращаем кортеж из нового количества и имени картриджа
         return new_qty, name
 
 # Выборка по всем картриджам из всех базы,
 # Вовзращает кортеж (id, cartridge_name, quantity, all_barcodes, last_update) по каждому айдишнику.
 async def get_all_cartridges():
     async with aiosqlite.connect(DB_PATH) as db:
-        sql_select ="""
+        sql_req ="""
             SELECT c.id, c.cartridge_name, c.quantity, group_concat(b.barcode, '; ') as all_barcodes, c.last_update
             FROM barcodes b LEFT JOIN cartridges as c ON c.id == b.cartridge_id
             GROUP by b.cartridge_id
         """
-        async with db.execute(sql_select, ()) as cursor:
+        async with db.execute(sql_req, ()) as cursor:
+            # Возвращаем СПИСОК кортежей, по одному на каждый картридж
             return await cursor.fetchall()
+
+# Вернет кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ИМЕНИ картриджа, или None если не найдено
+async def get_cartridge_by_name(cartridge_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        sql_req ="""
+            SELECT c.id, c.cartridge_name,  group_concat(b.barcode, '; ') as all_barcodes, c.quantity, c.last_update
+            FROM cartridges as c 
+            JOIN barcodes as b ON c.id == b.cartridge_id
+            WHERE c.cartridge_name LIKE ?
+            GROUP BY c.id
+        """
+        async with db.execute(sql_req, (cartridge_name,)) as cursor:
+            # Возвращаем кортеж из базы по нужной позиции или None, если ничего не найдено
+            return await cursor.fetchone()
+        
+# Вернет кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по БАРКОДУ картриджа, или None если не найдено
+# Используется подзапрос, т.к. сначала нужно найти ID картриджа и только потом выполнить JOIN по айдишнику
+# GROUP BY c.id обязательно, иначе будет сыпаться исключения в блоке обработки результатов. 
+# Если не нашлось ничего, то нужно вернуть None, а не кортеж из нонов..
+async def get_cartridge_by_barcode(barcode: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        sql_req = """
+            SELECT c.id, c.cartridge_name, group_concat(b.barcode, '; ') as all_barcodes, c.quantity, c.last_update
+            FROM cartridges as c
+            JOIN barcodes b ON c.id = b.cartridge_id
+            WHERE c.id = ( SELECT cartridge_id FROM barcodes WHERE barcode = ? )
+            GROUP BY c.id
+        """
+        async with db.execute(sql_req, (barcode,)) as cursor:
+            # Возвращаем кортеж из базы по нужной позиции или None, если ничего не найдено
+            return await cursor.fetchone()
         
 # Обновляет параметр notice_enabled в базе пользователей, для включения/отключения уведомлений.
 async def update_user_notice(telegram_id: int, notice_enabled: int):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-                    "UPDATE users SET notice_enabled = ? WHERE telegram_id = ?",(notice_enabled, telegram_id)
-                )
+        sql_req = """
+            UPDATE users
+            SET notice_enabled = ?
+            WHERE telegram_id = ?
+        """
+        await db.execute(sql_req, (notice_enabled, telegram_id) )
         await db.commit()
