@@ -95,7 +95,7 @@ async def handle_tsd_scan(request):
     ###################################### ОПЕРАЦИИ с БД И ОТВЕТЫ ################################################
     # Асинхронно дергаем функцию обновления базы, передаем штрихкод и изменение количества
     # Вернется кортеж (new_qty, name) если обновление прошло успешно, или строка с сигналом об ошибке вида NOT_FOUND:barcode или NO_STOCK:barcode
-    db_operation_res = await update_cartridge(barcode, change)
+    db_operation_res = await update_cartridge_count(barcode, change)
 
     # Список айдишников из базы пользователей для отправки уведомлений в тг
     user_ids = await get_tg_id_list_notification()
