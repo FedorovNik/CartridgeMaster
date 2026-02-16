@@ -243,3 +243,25 @@ async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int)
         except Exception as e:
             logger.error(f"Ошибка при добавлении нового картриджа: {e}")
             return None
+
+# Поиск картриджа по id
+# Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ID картриджа
+#             None, если не найдено
+async def get_cartridge_by_id(id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        sql_req = """
+                SELECT c.id, c.cartridge_name, group_concat(b.barcode, '; ') as all_barcodes, c.quantity, c.last_update
+                FROM cartridges as c
+                JOIN barcodes b ON c.id = b.cartridge_id
+                WHERE c.id = ?
+                GROUP BY c.id
+        """
+        async with db.execute(sql_req, (id,)) as cursor:
+            # Возвращаем кортеж из базы по выбранному картриджу
+            return await cursor.fetchone()
+
+# Удаление картриджа из таблиц cartridges и barcodes по уникальному ID
+# Ничего не возвращает
+async def delete_cartridge(id: str):
+    async with aiosqlite(DB_PATH) as db:
+        logger.info('asd')

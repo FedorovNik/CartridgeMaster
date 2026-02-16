@@ -15,7 +15,7 @@ from importlib.metadata import version
 from app.database.db_operations import add_user, get_all_users, user_exists, del_user,\
                                        get_all_cartridges, get_tg_id_list_notification,\
                                        get_cartridge_by_name, update_cartridge_count, update_user_notice,\
-                                       get_cartridge_by_barcode, insert_new_cartridge
+                                       get_cartridge_by_barcode, insert_new_cartridge, get_cartridge_by_id
 import logging
 
 import socket
@@ -498,12 +498,33 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
             return await message.answer(f"{line}", parse_mode="HTML")
         else:
             return await message.answer(f"Операция по добавлению не выполнена!\
-                                \nВозникла ошибка при вставке в базу", parse_mode="HTML")
+                                \nВозникла ошибка при вставке в базу.", parse_mode="HTML")
 
+# Хэндлер для удаления картриджа из базы
+@rt.message(Command("delete"))
+async def insert(message: Message, command: CommandObject, bot:Bot) -> Message | None:
+    if not command.args:
+        return await message.answer("Команда обновления количества картриджей в базе требует аргументов."
+                            "<b>\n/delete ID</b>"
+                            "\n\nПараметр ID - уникальный ID в базе, посмотреть все можно выведя список /list"
+                            "\nАккуратнее с этой командой, дополнительного предупреждения после вызова нет."
 
+                            "\n\nПример синтаксиса:\n"
+                            "<b>/delete 1</b>\n",
+                                parse_mode="HTML")
 
-    # Проверка: ищем по имени в базе, если найден - выходим с сообщением, что такое имя уже есть,
-    # и нужно использовать другую функцию по обновлению количества, а не вставлять новый, иначе будет дублирование позиций
+    # Нужен только один аргумент, потом сделать нормально
+    parts: list[str] = command.args.split()
+    if len(parts) != 1:
+        return await message.answer("Неверное количество аргументов команды!")
+    id: str = parts[0]
 
-   
-    # Вызываем функцию базы
+    # Проверка аргумента
+    if not is_number(id):
+        return await message.answer("Количество должно быть числом!")
+    if int(id) == 0:
+        return await message.answer("Нулевого ID не может быть в базе!")
+    
+    
+    result = await get_cartridge_by_id(id)
+    #logger.info(result)
