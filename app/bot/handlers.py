@@ -14,7 +14,7 @@ import platform
 from importlib.metadata import version
 from app.database.db_operations import add_user, get_all_users, user_exists, del_user,\
                                        get_all_cartridges, get_tg_id_list_notification,\
-                                       get_cartridge_by_name, update_cartridge, update_user_notice,\
+                                       get_cartridge_by_name, update_cartridge_count, update_user_notice,\
                                        get_cartridge_by_barcode, insert_new_cartridge
 import logging
 
@@ -81,7 +81,7 @@ async def help(message: Message) -> None:
     await message.answer(
     f"<b>Работа с таблицей картриджей:\n</b>"
     f"<b>/list</b>\nВывести всю инфу по картриджам.\n"
-    f"<b>/renew</b>\nОбновить количество определенного картриджа.\n"
+    f"<b>/updatecount</b>\nОбновить количество определенного картриджа.\n"
     f"<b>/insert</b>\nДобавить новый картридж, отсутствующий в таблице.\n"
     f"<b>/delete</b>\nУдалить запись о картридже из таблицы.\n\n"
 
@@ -255,17 +255,17 @@ async def notice(message: Message, command: CommandObject) -> Message | None:
 
 # Аналогичная функция по функционалу (как и в случае с ТСД) для обновления позиции количества картриджа в базе. 
 # Надо потом как нибудь переделать покрасивее  
-@rt.message(Command("renew"))
-async def renew(message: Message, command: CommandObject, bot:Bot) -> Message | None:
+@rt.message(Command("updatecount"))
+async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Message | None:
     
     if not command.args:
         return await message.answer("Команда обновления количества картриджей в базе требует аргументов.\n"
-                                "<b>/renew BARCODE CHANGE</b>\n"
+                                "<b>/updatecount BARCODE CHANGE</b>\n"
                                 "Параметр BARCODE принимает только штрих-код картриджа.\nПосмотреть все можно выведя список /list\n"
                                 "Параметр CHANGE принимает положительные и отрицательные значения от -15 до 15.\n"
                                 "Он определяет количество добавляемых картриджей в базу.\n\n"
                                 "Пример синтаксиса для добавления 2 шт картриджа TL-420:\n"
-                                "<b>/renew 123456789123 +2</b>\n",
+                                "<b>/updatecount 123456789123 +2</b>\n",
                                 parse_mode="HTML")
 
     # Нам нужно только два аргумента
@@ -292,7 +292,7 @@ async def renew(message: Message, command: CommandObject, bot:Bot) -> Message | 
     msg_text: str = f"TG_ID: {message.from_user.id}         | Имя: {message.from_user.first_name}"
 
     # Вызываем функцию базы
-    db_operation_res: tuple[int, str] | str = await update_cartridge(barcode, int(change))
+    db_operation_res: tuple[int, str] | str = await update_cartridge_count(barcode, int(change))
     
     # Обработка db_operation_res
     # Если вернулся кортеж из (new_qty, name)
@@ -350,7 +350,7 @@ async def renew(message: Message, command: CommandObject, bot:Bot) -> Message | 
             logger.info(f"| TELEGRAM |    Доставлено   | "+ msg_text)
             return
 
-    # Любой другой вариант это косяк update_cartridge()  — возвращаем 400
+    # Любой другой вариант это косяк update_cartridge_count()  — возвращаем 400
     else:       
         logger.error(f"| TELEGRAM | Ошибка БД | Вернула неожиданный результат: {db_operation_res}")
         for user_id in user_ids:
@@ -418,7 +418,7 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
                 line += f"\nИзменение:    {search_res_by_barcode[4]}"
                 line += f"\nID в базе:         {search_res_by_barcode[0]}"
-                line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /renew"    
+                line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /updatecount"    
                 return await message.answer(f"{line}", parse_mode="HTML")
             
             # Если айдишники не совпали, значит переданные пользователем штрихкод и имя связаны в базе с разными айдишками картриджей.
@@ -446,7 +446,7 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
                 line += f"\nИзменение:    {search_res_by_name[4]}"
                 line += f"\nID в базе:         {search_res_by_name[0]}"
-                line += f"\n\n\nЕсли необходимо изменить количество по этим позициям, используй команду /renew"
+                line += f"\n\n\nЕсли необходимо изменить количество по этим позициям, используй команду /updatecount"
                 return await message.answer(f"{line}", parse_mode="HTML")
         # Если вернулся только результат по штрихкоду, но не вернулся по имени, говорим об этом пользователю и выводим результат по штрихкоду
         if search_res_by_barcode:
@@ -460,7 +460,7 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
             line += f"\nИзменение:    {search_res_by_barcode[4]}"
             line += f"\nID в базе:         {search_res_by_barcode[0]}"
-            line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /renew"    
+            line += f"\n\nЕсли необходимо изменить количество по этому штрихкоду, используй команду /updatecount"    
             return await message.answer(f"{line}", parse_mode="HTML")
         # Если вернулся только результат по имени, но не вернулся по штриху, говорим об этом пользователю и выводим результат по имени
         elif search_res_by_name:
@@ -474,7 +474,7 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
             line += f"\nИзменение:    {search_res_by_name[4]}"
             line += f"\nID в базе:         {search_res_by_name[0]}"
-            line += f"\n\nЕсли необходимо изменить количество по этому имени, используй команду /renew"    
+            line += f"\n\nЕсли необходимо изменить количество по этому имени, используй команду /updatecount"    
             return await message.answer(f"{line}", parse_mode="HTML")
         
     # Если обе вернули None, можно вставлять новый картридж с этими данными.

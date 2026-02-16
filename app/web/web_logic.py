@@ -17,7 +17,7 @@ from aiohttp import web
 import json, logging
 
 # Функции для работы с базой
-from app.database.db_operations import update_cartridge, get_tg_id_list_notification
+from app.database.db_operations import update_cartridge_count, get_tg_id_list_notification
 
 # Фукнции шифрования json данных для обмена с ТСД по http.
 from app.web.crypto import decrypt_data, encrypt_data

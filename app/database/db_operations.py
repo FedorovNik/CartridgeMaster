@@ -54,6 +54,7 @@ async def create_tables():
         await db.commit()
 
 # Добавляет пользователя в базу по ID и имени
+# Ничего не возвращает
 async def add_user(telegram_id: int, first_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -62,45 +63,51 @@ async def add_user(telegram_id: int, first_name: str):
         """, (telegram_id, first_name))
         await db.commit()
 
-# Дропает пользователя из базы, возращает целое число о количестве выполненных операций.
-# Если есть два пользователя с одинаковым ID дропнет обоих 
+# Удаляет пользователя из базы, возращает целое число о количестве выполненных операций.
+# Если есть два пользователя с одинаковым ID дропнет обоих
+# Возвращает: целое число (количество удалений строк в базе)
+#             0, если не найден
 async def del_user(telegram_id: int) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("DELETE FROM users WHERE telegram_id = ?", (telegram_id,))
         await db.commit()
         # Если удалено больше 0 строк, значит пользователь был в базе
+        # Возвращаем количество удаленных строк
         return cursor.rowcount > 0
 
-# Вовзращает всю инфу по всем пользователям
+# Поиск инфы по всем пользователям базы
+# Возвращает: список из кортежей (id, telegram_id, first_name, notice_enabled)
 async def get_all_users():
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT * FROM users") as cursor:
             return await cursor.fetchall()
-        
-# Вовзращает выборку из всех айдишников пользователей базы у которых включены уведомления)
+
+# Поиск всех пользователей, у которых включены уведомления
+# Вовзращает список из ID пользователей базы, у которых включены уведомления
 async def get_tg_id_list_notification():
     async with aiosqlite.connect(DB_PATH) as db:
         # Выполняем запрос на выборку всех ID
         async with db.execute("SELECT telegram_id FROM users WHERE notice_enabled = 1") as cursor:
             rows = await cursor.fetchall()
-            
             # Извлекаем айдишник из кортежей (fetchall возвращает список кортежей вида [(123,), (456,)])
             return [row[0] for row in rows]
         
-# Используется в связке с базовым фильтром, для обработки сообщений только "доверенных" лиц из базы
-# Ищет пользователя по айдишнику, возвращает строку из таблицы
+# Ищет пользователя по айдишнику в базе, используется в связке с базовым фильтром для обработки
+# сообщений только "доверенных" лиц из базы.
+# Возвращает: Кортеж из ID пользователя, если он найден
+#             None
 async def user_exists(telegram_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT 1 FROM users WHERE telegram_id = ?", (telegram_id,)) as cursor:
             # В результате строка из базы или None, если ничего не найдено
             result = await cursor.fetchone()
-            # Приводим к булеву типу для удобства использования в фильтре
+            # Возвращаем кортеж
             return result is not None
 
-# Обновляет количество картриджа с штрихкодом `barcode` на `change`.
-# Если barcode найден — возвращает кортеж (new_qty, name).
-# Если barcode не найден — возвращает строку NOT_FOUND:barcode_or_name"
-async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
+# Обновляет количество картриджа со штрихкодом `barcode` на `change`.
+# Возвращает: кортеж (new_qty, name) если штрих не найден.
+#             строку NOT_FOUND:barcode_or_name"
+async def update_cartridge_count(barcode: str, change: int) -> tuple[int, str] | str:
     async with aiosqlite.connect(DB_PATH) as db:
         # Ищем картридж в cartridges, связанный с этим штрихкодом из таблицы barcodes
         sql_req = """
@@ -148,8 +155,8 @@ async def update_cartridge(barcode: str, change: int) -> tuple[int, str] | str:
         # Возвращаем кортеж из нового количества и имени картриджа
         return new_qty, name
 
-# Выборка по всем картриджам из всех базы,
-# Вовзращает кортеж (id, cartridge_name, quantity, all_barcodes, last_update) по каждому айдишнику.
+# Выборка по всем картриджам из всех базы
+# Возвращает: кортеж (id, cartridge_name, quantity, all_barcodes, last_update) по каждому айдишнику.
 async def get_all_cartridges():
     async with aiosqlite.connect(DB_PATH) as db:
         sql_req ="""
@@ -161,7 +168,9 @@ async def get_all_cartridges():
             # Возвращаем СПИСОК кортежей, по одному на каждый картридж
             return await cursor.fetchall()
 
-# Вернет кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ИМЕНИ картриджа, или None если не найдено
+# Поиск по имени
+# Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ИМЕНИ картриджа
+#             None, если не найдено
 async def get_cartridge_by_name(cartridge_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
         sql_req ="""
@@ -175,10 +184,12 @@ async def get_cartridge_by_name(cartridge_name: str):
             # Возвращаем кортеж из базы по нужной позиции или None, если ничего не найдено
             return await cursor.fetchone()
         
-# Вернет кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по БАРКОДУ картриджа, или None если не найдено
+# Поиск по штрих-коду
 # Используется подзапрос, т.к. сначала нужно найти ID картриджа и только потом выполнить JOIN по айдишнику
 # GROUP BY c.id обязательно, иначе будет сыпаться исключения в блоке обработки результатов. 
 # Если не нашлось ничего, то нужно вернуть None, а не кортеж из нонов..
+# Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по баркоду картриджа
+#             None, если не найдено
 async def get_cartridge_by_barcode(barcode: str):
     async with aiosqlite.connect(DB_PATH) as db:
         sql_req = """
@@ -193,6 +204,7 @@ async def get_cartridge_by_barcode(barcode: str):
             return await cursor.fetchone()
         
 # Обновляет параметр notice_enabled в базе пользователей, для включения/отключения уведомлений.
+# Изменяет базу, ничего не возвращает
 async def update_user_notice(telegram_id: int, notice_enabled: int):
     async with aiosqlite.connect(DB_PATH) as db:
         sql_req = """
@@ -203,21 +215,22 @@ async def update_user_notice(telegram_id: int, notice_enabled: int):
         await db.execute(sql_req, (notice_enabled, telegram_id) )
         await db.commit()
 
-# 
+# Создает новую строку в базе cartridges и barcodes по переданным параметрам.
+# Изменяет базу, возвращает True или False
 async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int):
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            # запрос на вставку нового картриджа в cartridges
+            # Запрос на вставку нового картриджа в cartridges
             sql_req = """
                     INSERT INTO cartridges (cartridge_name, quantity, last_update)
                     VALUES (?, ?, ?)
             """
-            # результат выполнения заносим в объект курсора, у него есть метод для получения ID последней записи
+            # Результат выполнения заносим в объект курсора, у него есть метод для получения ID последней записи
             curs_res = await db.execute(sql_req, (cartridge_name, quantity, current_time) )
             new_cartridge_id = curs_res.lastrowid
 
-            # запрос на вставку штрих кода и определенным ID картриджа в barcodes
+            # Запрос на вставку штрих кода и определенным ID картриджа в barcodes
             sql_req2 = """
                     INSERT INTO barcodes (barcode, cartridge_id)
                     VALUES (?, ?)
@@ -225,8 +238,6 @@ async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int)
             await db.execute(sql_req2, (barcode, new_cartridge_id) )
             await db.commit()
 
-            #logger.info(curs_res)
-            #return curs_res
             return True
         
         except Exception as e:
