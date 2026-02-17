@@ -523,8 +523,25 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
     if not is_number(id):
         return await message.answer("Количество должно быть числом!")
     if int(id) == 0:
-        return await message.answer("Нулевого ID не может быть в базе!")
+        return await message.answer("ID=0 не может быть в базе!")
     
     
     result = await get_cartridge_by_id(id)
-    #logger.info(result)
+
+    await message.answer(f"Картридж найден!\nПоследняя информация об этом картридже из базы:", parse_mode="HTML")
+  
+    line = f"\nИмя:                  {result[1]}"
+    line += f"\nКоличество:   {result[3]}"
+    barcodes_list = result[2].split("; ")
+    for i in barcodes_list:
+        line += f"\nШтрих-код:     <b>{i}</b>"
+
+    line += f"\nИзменение:    {result[4]}"
+    line += f"\nID в базе:         {result[0]}"
+    await message.answer(f"{line}", parse_mode="HTML")
+
+    #дописать удаление и всё
+
+    return await message.answer(f"Информация по этой позиции полностью удалена из базы!", parse_mode="HTML")
+
+    
