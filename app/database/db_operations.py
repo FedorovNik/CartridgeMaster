@@ -17,6 +17,7 @@ async def create_tables():
                 notice_enabled BOOLEAN DEFAULT 0
             )
         """)
+        # Добавление меня по умолчанию =)
         await db.execute("""
             INSERT OR IGNORE INTO users (telegram_id, first_name, notice_enabled)
             VALUES (?, ?, ?)
@@ -43,7 +44,7 @@ async def create_tables():
         # Таблица истории изменений количества картриджей, для будущих прогнозов и аналитики.
         await db.execute("""
             CREATE TABLE IF NOT EXISTS update_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_number INTEGER PRIMARY KEY AUTOINCREMENT,
                 barcode TEXT,
                 action_type BOOLEAN,
                 update_quantity INTEGER,
@@ -57,10 +58,17 @@ async def create_tables():
 # Ничего не возвращает
 async def add_user(telegram_id: int, first_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+        sql_req_new_user="""
             INSERT OR IGNORE INTO users (telegram_id, first_name)
             VALUES (?, ?)
-        """, (telegram_id, first_name))
+        """
+        try:
+            await db.execute(sql_req_new_user, (telegram_id, first_name))
+        except Exception as e:
+            logger.error('|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица users           | Вызвано исключение при добавлении пользователя с telegram_id={telegram_id}!')
+            return None
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица users           | Добавление пользователя с telegram_id={telegram_id} выполнено!')
+
         await db.commit()
 
 # Удаляет пользователя из базы, возращает целое число о количестве выполненных операций.
@@ -110,18 +118,19 @@ async def user_exists(telegram_id: int):
 async def update_cartridge_count(barcode: str, change: int) -> tuple[int, str] | str:
     async with aiosqlite.connect(DB_PATH) as db:
         # Ищем картридж в cartridges, связанный с этим штрихкодом из таблицы barcodes
-        sql_req = """
+        sql_req_find_by_barcode = """
             SELECT c.id, c.cartridge_name, c.quantity 
             FROM cartridges c
             JOIN barcodes b ON c.id = b.cartridge_id
             WHERE b.barcode = ?
         """
-        async with db.execute(sql_req, (barcode,)) as cursor:
+        async with db.execute(sql_req_find_by_barcode, (barcode,)) as cursor:
             # Кортеж из базы в строку row, или None в row если ничего не найдено
             row = await cursor.fetchone()
 
         # Если не ничего не нашли, выходим с сигналом NOT_FOUND
         if not row:
+            logger.warning(f"|  SQLITE  |   НЕ НАЙДЕНО    |  Таблица barcodes        | Штрих-код: {barcode} не найден в базе!")
             return f"NOT_FOUND:{barcode}"
 
         # После выполнения запроса заносим данные из кортежа в переменные и вычисляем новое количество
@@ -130,6 +139,7 @@ async def update_cartridge_count(barcode: str, change: int) -> tuple[int, str] |
         # Проверка на отрицательный остаток
         # Если после предыдущего вычисления вышло меньше нуля, выходим с сигналом NO_STOCK
         if new_qty < 0:
+            logger.warning(f"|  SQLITE  |   НЕДОПУСТИМО   |  ПРОВЕРКА ВВОДА          | Картридж найден, но выбрано недопустимое изменение количества!")
             return f"NO_STOCK:{name}"
 
         # Берем текущее время для записи для обновления записей в таблицах
@@ -137,22 +147,36 @@ async def update_cartridge_count(barcode: str, change: int) -> tuple[int, str] |
         # Разница в пару милисекунд несущественна, так что просто генерируем время на стороне питона.
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # Обновляем количество и время последнего обновления в основной таблице
-        await db.execute(
-            "UPDATE cartridges SET quantity = ?, last_update = ? WHERE id = ?",
-            (new_qty, current_time, c_id)
-        )
+        sql_req_update_cartridges = """
+                UPDATE cartridges
+                SET quantity = ?, last_update = ?
+                WHERE id = ?
+                """
+        try:
+            await db.execute(sql_req_update_cartridges, (new_qty, current_time, c_id) )
+        except Exception as e:
+            logger.error("|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица cartridges      | Вызвано исключение при попытке обновления id={c_id}!")
+            return None
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица cartridges      | Обновление позиции с id={c_id} выполнено!')
+
+
 
         # Логируем историю об операции в таблицу (action_type: 1 если приход/ноль, 0 если расход)
         action_type = 1 if change >= 0 else 0
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        sql_req2 = """
+        sql_req_new_history_string = """
                 INSERT INTO update_history (barcode, action_type, update_quantity, balance, update_time)
                 VALUES (?, ?, ?, ?, ?)
             """
-        await db.execute(sql_req2, (barcode, action_type, abs(change), new_qty, current_time) )
-        await db.commit()
+        try:
+            await db.execute(sql_req_new_history_string, (barcode, action_type, abs(change), new_qty, current_time) )
+        except Exception as e:
+            logger.error("|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица update_history  | Вызвано исключение при попытке обновления id={c_id}!")
+            return None
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица update_history  | Обновление позиции с id={c_id} выполнено!')
 
-        # Возвращаем кортеж из нового количества и имени картриджа
+        # Комитим базу и возвращаем кортеж из нового количества и имени картриджа
+        await db.commit()
         return new_qty, name
 
 # Выборка по всем картриджам из всех базы
@@ -219,30 +243,40 @@ async def update_user_notice(telegram_id: int, notice_enabled: int):
 # Изменяет базу, возвращает True или False
 async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int):
     async with aiosqlite.connect(DB_PATH) as db:
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+        # Запрос на вставку нового картриджа в cartridges
+        sql_req_new_cartridge = """
+                INSERT INTO cartridges (cartridge_name, quantity, last_update)
+                VALUES (?, ?, ?)
+        """
         try:
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            # Запрос на вставку нового картриджа в cartridges
-            sql_req = """
-                    INSERT INTO cartridges (cartridge_name, quantity, last_update)
-                    VALUES (?, ?, ?)
-            """
             # Результат выполнения заносим в объект курсора, у него есть метод для получения ID последней записи
-            curs_res = await db.execute(sql_req, (cartridge_name, quantity, current_time) )
+            curs_res = await db.execute(sql_req_new_cartridge, (cartridge_name, quantity, current_time) )
             new_cartridge_id = curs_res.lastrowid
-
-            # Запрос на вставку штрих кода и определенным ID картриджа в barcodes
-            sql_req2 = """
-                    INSERT INTO barcodes (barcode, cartridge_id)
-                    VALUES (?, ?)
-            """
-            await db.execute(sql_req2, (barcode, new_cartridge_id) )
-            await db.commit()
-
-            return True
-        
         except Exception as e:
-            logger.error(f"Ошибка при добавлении нового картриджа: {e}")
+            logger.error("|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица cartridges      | Вызвано исключение при попытке добавления нового картриджа!")
             return None
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица cartridges      | Добавление позиции с id={new_cartridge_id} выполнено!')    
+
+
+        # Запрос на вставку штрих кода и определенным ID картриджа в barcodes
+        sql_req_new_barcode = """
+                INSERT INTO barcodes (barcode, cartridge_id)
+                VALUES (?, ?)
+        """
+        try:
+            await db.execute(sql_req_new_barcode, (barcode, new_cartridge_id) )
+        except Exception as e:
+            logger.info(f'|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица barcodes        | Вызвано исключение при попытке добавления нового картриджа!')
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица barcodes        | Добавление позиции с id={new_cartridge_id} выполнено!')
+
+
+        await db.commit()
+        return True
+        
+
 
 # Поиск картриджа по id
 # Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ID картриджа
@@ -260,8 +294,46 @@ async def get_cartridge_by_id(id: str):
             # Возвращаем кортеж из базы по выбранному картриджу
             return await cursor.fetchone()
 
-# Удаление картриджа из таблиц cartridges и barcodes по уникальному ID
-# Ничего не возвращает
+# Удаление картриджа из всех таблиц по уникальному ID
+# Возdращает TRUE или FALSE, выполнились все операции или нет.
 async def delete_cartridge(id: str):
-    async with aiosqlite(DB_PATH) as db:
-        logger.info('asd')
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Сначала удаляем из barcodes (т.к. есть связи с первой таблицей) и только потом из cartridges
+        sql_req_barcodes = """
+        DELETE FROM barcodes as b
+        WHERE b.cartridge_id = ?
+        """
+        sql_req_cartridges = """
+        DELETE FROM cartridges as c
+        WHERE c.id = ?
+        """
+        # Удаление из barcodes
+        try:
+            # Норм поведение
+            if await db.execute(sql_req_barcodes,   (id,) ):
+                logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица barcodes        | Позиции с id={id} удалены!')
+            # Если косяк в sql запросе и переданном id     |  Таблица cartridges      |
+            else:
+                logger.error(f'|  SQLITE  |     ОШИБКА      |  Таблица barcodes        | Позиции с id={id} не удалены!')
+                return False
+        # Еще обработка исключения на всякий случай
+        except Exception as e:
+            logger.info("|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица barcodes        | Вызвано исключение при попытки удаления id={id}!")
+            return False
+
+        # Удаление из cartridges
+        try:
+            # Норм поведение
+            if await db.execute(sql_req_cartridges,   (id,) ):
+                logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица cartridges      | Позиции с id={id} удалены!')
+            # Если косяк в sql запросе и переданном id
+            else:
+                logger.error(f'|  SQLITE  |     ОШИБКА      |  Таблица cartridges      | Позиции с id={id} не удалены!')
+                return False
+        # Еще обработка исключения на всякий случай
+        except Exception as e:
+            logger.info("|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица cartridges      | Вызвано исключение при попытке удаления id={id}!")
+            return False
+
+        await db.commit()
+        return True

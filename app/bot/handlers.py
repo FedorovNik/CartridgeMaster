@@ -15,7 +15,8 @@ from importlib.metadata import version
 from app.database.db_operations import add_user, get_all_users, user_exists, del_user,\
                                        get_all_cartridges, get_tg_id_list_notification,\
                                        get_cartridge_by_name, update_cartridge_count, update_user_notice,\
-                                       get_cartridge_by_barcode, insert_new_cartridge, get_cartridge_by_id
+                                       get_cartridge_by_barcode, insert_new_cartridge, get_cartridge_by_id, \
+                                       delete_cartridge
 import logging
 
 import socket
@@ -208,7 +209,7 @@ async def list_cartridges(message: Message) -> Message | SendMessage | None:
             line += f"Штрих-код:     <b>{barcode}</b>\n"
 
         line += f"Изменение:    <b>{last_update}</b>\n"
-        line += f"ID в базе: <b>{id}</b>\n"
+        line += f"ID в базе:         <b>{id}</b>\n"
         text_lines.append(line)
 
     # Собираем полное сообщение из частей и отправляем его в ответ на команду /list
@@ -289,7 +290,7 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
     user_ids = await get_tg_id_list_notification()
 
     # Заготовка текста для answer
-    msg_text: str = f"TG_ID: {message.from_user.id}         | Имя: {message.from_user.first_name}"
+    msg_text: str = f"  TG_ID: {message.from_user.id}        | Имя: {message.from_user.first_name}"
 
     # Вызываем функцию базы
     db_operation_res: tuple[int, str] | str = await update_cartridge_count(barcode, int(change))
@@ -299,18 +300,17 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
     # Отправляем уведомление в тг ВСЕМ кто в рассылке и логируем как инфо
     if isinstance(db_operation_res, tuple) and len(db_operation_res) == 2:
         balance, cartridge_name = db_operation_res
-        logger.info(f"| TELEGRAM |   Обновлена БД  | Штрих-код: {barcode} | Имя: {cartridge_name} | Количество: {balance}")
+        #logger.info(f"| TELEGRAM |   Обновлена БД  | Штрих-код: {barcode} | Имя: {cartridge_name} | Количество: {balance}")
         for user_id in user_ids:
             try:
                 await bot.send_message(chat_id=user_id, 
-                                       text=f"Выполнено!\
-                                       \nШтрих-код: {barcode}\
-                                       \nНаименование: {cartridge_name}\
-                                       \nНовое количество: {balance}")
+                                       text=f"Операция выполнена.\
+                                       \nИмя:                  <b>{cartridge_name}</b>\
+                                       \nКоличество:   <b>{balance}</b>", parse_mode="HTML")
                 
-                logger.info(f"| TELEGRAM |    Доставлено   | " + msg_text)
+                logger.info(f"| TELEGRAM |    Доставлено   |" + msg_text)
             except Exception as e:
-                logger.warning(f"| TELEGRAM |  Не доставлено  | "+ msg_text)
+                logger.warning(f"| TELEGRAM |  Не доставлено  |"+ msg_text)
                 return None
             return
         
@@ -322,21 +322,21 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
         
         # Если не найден картридж по штриху в базе отправляем в лог и в тг-ответ
         if db_operation_res.startswith("NOT_FOUND:"):
-            logger.warning(f"| TELEGRAM | Не обновлена БД | Не найден штрих-код: {barcode_or_name}")
+            #logger.warning(f"| TELEGRAM | Не обновлена БД | Не найден штрих-код: {barcode_or_name}")
             # Если не ушел ответ тоже логируем
             try:
                 await message.answer(f"Операция не выполнена!\
-                                     \nПричина: нет в базе.\
-                                     \nШтрих-код: {barcode_or_name}")
+                                     \nПричина:              <b>нет в базе</b>.\
+                                     \nШтрих-код:        <b>{barcode_or_name}</b>",parse_mode="HTML")
             except Exception as e:
                 logger.warning(f"| TELEGRAM | Не доставлено | "+ msg_text)
                 return None
-            logger.info(f"| TELEGRAM |    Доставлено   | " + msg_text)
+            logger.info(f"| TELEGRAM |    Доставлено   |" + msg_text)
             return
         
         # Если не получилось изменить количество в базе отправляем в лог и в тг-ответ
         if db_operation_res.startswith("NO_STOCK:"):
-            logger.warning(f"| TELEGRAM | Не обновлена БД | Нет на складе или отрицательное количество: {barcode_or_name}")
+            #logger.warning(f"| TELEGRAM | Не обновлена БД | Нет на складе или отрицательное количество: {barcode_or_name}")
             # Если не ушел ответ тоже логируем
             try:
                 await message.answer(f"Операция не выполнена!\
@@ -525,23 +525,31 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
     if int(id) == 0:
         return await message.answer("ID=0 не может быть в базе!")
     
-    
+    # Ищем в базе по ID
     result = await get_cartridge_by_id(id)
 
-    await message.answer(f"Картридж найден!\nПоследняя информация об этом картридже из базы:", parse_mode="HTML")
-  
-    line = f"\nИмя:                  {result[1]}"
-    line += f"\nКоличество:   {result[3]}"
-    barcodes_list = result[2].split("; ")
-    for i in barcodes_list:
-        line += f"\nШтрих-код:     <b>{i}</b>"
+    if result:
+        await message.answer(f"Картридж найден!\nПоследняя информация об этом картридже из базы:", parse_mode="HTML")
+        line = f"\nИмя:                  <b>{result[1]}</b>"
+        line += f"\nКоличество:   <b>{result[3]}</b>"
+        barcodes_list = result[2].split("; ")
+        for i in barcodes_list:
+            line += f"\nШтрих-код:     <b>{i}</b>"
 
-    line += f"\nИзменение:    {result[4]}"
-    line += f"\nID в базе:         {result[0]}"
-    await message.answer(f"{line}", parse_mode="HTML")
+        line += f"\nИзменение:    <b>{result[4]}</b>"
+        line += f"\nID в базе:         <b>{result[0]}</b>"
+        await message.answer(f"{line}", parse_mode="HTML")
 
-    #дописать удаление и всё
+        # Вызов функции базы, можно передать строку от пользователя или строку из базы, разницы нет
+        if await delete_cartridge(id):
+            return await message.answer(f"Информация по этой позиции успешно удалена из базы!", parse_mode="HTML")
+        else:
+            return await message.answer(f"Ошибка удаления из базы!\nПодробнее в серверных логах.", parse_mode="HTML")
+    else:
+        await message.answer(f"Картридж по этому ID не найден!")
 
-    return await message.answer(f"Информация по этой позиции полностью удалена из базы!", parse_mode="HTML")
-
-    
+# Этот хэндлер сработает на любое текстовое сообщение, 
+# которое не перехватили команды выше    
+@rt.message()
+async def echo_all(message: Message):
+    await message.answer("Я не понял, пиши /help")
