@@ -56,24 +56,26 @@ async def start(message: Message) -> None:
     aiogram_ver: str = version("aiogram")
     aiohttp_ver: str = version("aiohttp")
     aiosqlite_ver: str = version("aiosqlite")
-    await message.answer(f"<b>Привет, {message.from_user.first_name}!</b>\n"
-                        f"Этот бот работает на асинхронном python фреймворке для ТГ-ботов <code>aiogram</code>.\n"
-                        f"Вся БД SQLite хранится в файле <code>database.db</code>, коротый находится в той же директории с программой.\n"
-                        f"Любое сообщение, отправленное боту проверяется - находится ли отправитель в базе (таблице users).\n"
-                        f"Бот отвечает только людям, которые находятся в базе.\n\n"
-                        f"Бот, локальный веб-сервер работают в 1 процессе и 1 потоке, с помощью кооперативной многозадачности, \
-                            которую обеспечивает асинхронная библиотека <code>asyncio</code>.\n\n"
-                        f"Программа логически разделена на 2 модуля (директории <b>bot</b> и <b>web</b>):\n"
-                        f"1. Диспетчер бота регистрирует и обрабатывает все события, получаемые от серверов телеграма.\n"
-                        f"2. HTTP-сервер принимает и обрабатывает POST-запросы от ТСД по адресу http://{local_ip}:8080/scan.\
-                            Трафик между ТСД и веб-сервером передается в зашифрованном виде (алгоритм AES).\
-                            \nКлюч шифрования AES_KEY зашит в коде на серверной части и ТСД-шнике.\n\n"
-                        f"<b>Краткая информация о версиях:</b>\n"
-                        f"Python:  <code>{python_ver}</code>.\n"
-                        f"Aiogram: <code>{aiogram_ver}</code>\n"
-                        f"Aiohttp: <code>{aiohttp_ver}</code>\n"
-                        f"Aiosqlite: <code>{aiosqlite_ver}</code>\n\n"
-                        f"Для получения справки по командам бота вызови <b>/help</b>\n"
+    await message.answer(f"<b>Привет, {message.from_user.first_name}!</b>"
+                        f"\nБот работает на асинхронном python фреймворке для ТГ-ботов <code>aiogram</code>."
+                        f" Требуемые зависимости представлены списком в <code>requirements.txt</code> в корне."
+                        f" База данных SQLite с картриджами, пользователями и историей расходов хранится в файле <code>database.db</code>,"
+                        f" коротый находится в той же директории с программой."
+                        f"\nЛюбое сообщение, отправленное боту проверяется - находится ли отправитель в базе (таблице users)."
+                        f" Бот отвечает только людям, которые находятся в этой локальной базе."
+                        f"\n\nПрограмма логически разделена на 2 модуля - директории <b>bot</b> и <b>web</b>."
+                        f"\nБот и веб-сервер работают в 1 процессе и 1 потоке, с помощью кооперативной многозадачности,"
+                        f" которую обеспечивает асинхронная библиотека <code>asyncio</code>."
+                        f"\n1. Диспетчер бота регистрирует и обрабатывает все события, получаемые от серверов телеграма."
+                        f"\n2. HTTP-сервер принимает и обрабатывает POST-запросы от ТСД по адресу http://{local_ip}:8080/scan.\
+                            \nТрафик между ТСД и веб-сервером передается в зашифрованном виде (алгоритм AES).\
+                            \nКлюч шифрования AES_KEY зашит в коде на серверной части и ТСД-шнике."
+                        f"\n\n<b>Краткая основная информация о версиях:</b>"
+                        f"\nPython:  <code>{python_ver}</code>."
+                        f"\nAiogram: <code>{aiogram_ver}</code>"
+                        f"\nAiohttp: <code>{aiohttp_ver}</code>"
+                        f"\nAiosqlite: <code>{aiosqlite_ver}</code>"
+                        f"\n\nДля получения справки по командам бота вызови <b>/help</b>\n"
                         ,parse_mode="HTML"
     )
 
@@ -98,9 +100,10 @@ async def help(message: Message) -> None:
 async def adduser(message: Message, command: CommandObject) -> Message | None:
     # Проверяем, что аргументы вообще есть
     if not command.args:
-        return await message.answer("Команда добавления пользователя требует аргументов.\n"
-                                    "Пример синтаксиса:\n"
-                                    "<b>/adduser TG_ID USER_NAME</b>\n",
+        return await message.answer("Команда добавления пользователя в базу требует аргументов:"
+                                    "\n<b>/adduser TG_ID USER_NAME</b>\n"
+                                    "\n\nTG_ID: уникальный телеграм идентификатор пользователя"
+                                    "\nUSER_NAME: имя пользователя в локальной базе",
                                     parse_mode="HTML")
     
     # Проверка кол-ва аргументов, ожидается только ID и NAME
@@ -125,9 +128,9 @@ async def adduser(message: Message, command: CommandObject) -> Message | None:
 async def deluser(message: Message, command: CommandObject) -> Message | None:
     # Проверяем, что аргументы вообще есть
     if not command.args:
-        return await message.answer("Команда удаления пользователя требует аргументов.\n"
-                                    "Пример синтаксиса:\n"
-                                    "<b>/deluser TG_ID</b>\n",
+        return await message.answer("Команда удаления пользователя из базы требует аргументов:"
+                                    "\n<b>/deluser TG_ID</b>"
+                                    "\n\nTG_ID: уникальный телеграм идентификатор пользователя",
                                     parse_mode="HTML")
     
     # Проверка кол-ва аргументов, ожидается только один айдишник
@@ -192,10 +195,10 @@ async def list_cartridges(message: Message) -> Message | SendMessage | None:
             status_color = "❌ Мало!  "
         else:
             # Если количество отрицательное, то это косяк в базе, который нужно исправить
-            logger.error(f"| TELEGRAM | /list | Отрицательное количество по позиции | ID: {id} Наименование: {cartridge_name} Количество: {quantity}")
+            logger.error(f"| TELEGRAM |   НЕДОПУСТИМО   | Отрицательное количество | ID: {id} Наименование: {cartridge_name} Количество: {quantity}")
             return message.answer(f"В базе отрицательное количество!\
                                   \nID:{id}\
-                                  \nШтрих-коды:{all_barcodes}\
+                                  \nШтрих-код:{all_barcodes}\
                                   \nНаименование:{cartridge_name}\
                                   \nКоличество:{quantity}")
         
@@ -222,11 +225,11 @@ async def list_cartridges(message: Message) -> Message | SendMessage | None:
 async def notice(message: Message, command: CommandObject) -> Message | None:
     # Проверяем, что аргументы вообще есть
     if not command.args:
-        return await message.answer("Команда включения уведомлений пользователям от ТСД требует аргументов.\n"
-                                    "<b>/notice TG_ID ON_OFF</b>\n"
-                                    "Параметр ON_OFF принимает только булевые 0 и 1, отвечает за включение и отключение уведомлений.\n"
-                                    "Пример синтаксиса для включения уведомлений:\n"
-                                    "<b>/notice 123456789 1</b>\n",
+        return await message.answer("Команда включения уведомлений пользователям от ТСД требует аргументов."
+                                    "\n\n<b>/notice TG_ID ON_OFF</b>"
+                                    "\nПараметр ON_OFF принимает только булевые 0 и 1, отвечает за включение и отключение уведомлений."
+                                    "\n\nПример синтаксиса для включения уведомлений:"
+                                    "\n<b>/notice 123456789 1</b>",
                                     parse_mode="HTML")
     
     # Проверка кол-ва аргументов, ожидается только ID(цифровая) и BOOL(булевая)
@@ -260,13 +263,13 @@ async def notice(message: Message, command: CommandObject) -> Message | None:
 async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Message | None:
     
     if not command.args:
-        return await message.answer("Команда обновления количества картриджей в базе требует аргументов.\n"
-                                "<b>/updatecount BARCODE CHANGE</b>\n"
-                                "Параметр BARCODE принимает только штрих-код картриджа.\nПосмотреть все можно выведя список /list\n"
-                                "Параметр CHANGE принимает положительные и отрицательные значения от -15 до 15.\n"
-                                "Он определяет количество добавляемых картриджей в базу.\n\n"
-                                "Пример синтаксиса для добавления 2 шт картриджа TL-420:\n"
-                                "<b>/updatecount 123456789123 +2</b>\n",
+        return await message.answer("Команда обновления количества картриджей в базе требует аргументов."
+                                "\n<b>/updatecount BARCODE CHANGE</b>"
+                                "\n\n<b>BARCODE</b>: принимает только штрих-код картриджа. Посмотреть все можно выведя список /list"
+                                "\n<b>CHANGE</b>: принимает положительные и отрицательные значения от -15 до 15."
+                                "Он определяет количество добавляемых картриджей в базу."
+                                "\n\nПример синтаксиса для добавления 2 шт картриджа TL-420:"
+                                "\n/updatecount <b>123456789123 +2</b>",
                                 parse_mode="HTML")
 
     # Нам нужно только два аргумента
@@ -308,9 +311,9 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
                                        \nИмя:                  <b>{cartridge_name}</b>\
                                        \nКоличество:   <b>{balance}</b>", parse_mode="HTML")
                 
-                logger.info(f"| TELEGRAM |    Доставлено   |" + msg_text)
+                logger.info(f"| TELEGRAM |    ДОСТАВЛЕНО   |" + msg_text)
             except Exception as e:
-                logger.warning(f"| TELEGRAM |  Не доставлено  |"+ msg_text)
+                logger.warning(f"| TELEGRAM |  НЕ ДОСТАВЛЕНО  |"+ msg_text)
                 return None
             return
         
@@ -329,9 +332,9 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
                                      \nПричина:              <b>нет в базе</b>.\
                                      \nШтрих-код:        <b>{barcode_or_name}</b>",parse_mode="HTML")
             except Exception as e:
-                logger.warning(f"| TELEGRAM | Не доставлено | "+ msg_text)
+                logger.warning(f"| TELEGRAM | НЕ ДОСТАВЛЕНО | "+ msg_text)
                 return None
-            logger.info(f"| TELEGRAM |    Доставлено   |" + msg_text)
+            logger.info(f"| TELEGRAM |    ДОСТАВЛЕНО   |" + msg_text)
             return
         
         # Если не получилось изменить количество в базе отправляем в лог и в тг-ответ
@@ -345,14 +348,14 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
                                      отрицательное количество после выполнения операции.\
                                     ")
             except Exception as e:
-                logger.warning(f"| TELEGRAM | Не доставлено | "+ msg_text)
+                logger.warning(f"| TELEGRAM | НЕ ДОСТАВЛЕНО | "+ msg_text)
                 return None
-            logger.info(f"| TELEGRAM |    Доставлено   | "+ msg_text)
+            logger.info(f"| TELEGRAM |    ДОСТАВЛЕНО   | "+ msg_text)
             return
 
     # Любой другой вариант это косяк update_cartridge_count()  — возвращаем 400
-    else:       
-        logger.error(f"| TELEGRAM | Ошибка БД | Вернула неожиданный результат: {db_operation_res}")
+    else:
+        logger.error(f"| TELEGRAM |      ОШИБКА     | Вернула неожиданный результат: {db_operation_res}")
         for user_id in user_ids:
             return await bot.send_message(chat_id=user_id, text=f"Ошибка!\
                                                                 \nНеожиданный ответ от БД.\

@@ -130,7 +130,7 @@ async def update_cartridge_count(barcode: str, change: int) -> tuple[int, str] |
 
         # Если не ничего не нашли, выходим с сигналом NOT_FOUND
         if not row:
-            logger.warning(f"|  SQLITE  |   НЕ НАЙДЕНО    |  Таблица barcodes        | Штрих-код: {barcode} не найден в базе!")
+            logger.warning(f"|  SQLITE  |    НЕ НАЙДЕНО   |  Таблица barcodes        | Штрих-код: {barcode} не найден в базе!")
             return f"NOT_FOUND:{barcode}"
 
         # После выполнения запроса заносим данные из кортежа в переменные и вычисляем новое количество

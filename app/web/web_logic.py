@@ -62,13 +62,13 @@ async def handle_tsd_scan(request):
 
     ####################################### БЛОК ПРОВЕРОК ########################################################
     # Логируем весь полученный JSON в консоль
-    logger.info(f"|    ТСД   |   Получен JSON  | Расшировка: {data}")
+    logger.info(f"|   ТСД    |   Получен JSON  | Расшировка: {data}")
 
     # Базовая проверка на существование полей barcode и action в полученном JSON
     if "barcode" not in data or "action" not in data:
         # Если косяк то логируем и отвечаем ошибкой 400
-        logger.warning("Неверный json-формат, поле barcode или action отсутствует!")
-        error_response = encrypt_data("Неверный json-формат, поле barcode или action отсутствует!")
+        logger.warning(f"|   ТСД    |   Ошибка JSON   | Неверный json-формат, поле barcode или action отсутствует!")
+        error_response = encrypt_data("Неверный json-формат. Поле barcode или action отсутствует!")
         return web.Response(text=error_response, status=400)
     # Простая проверка пройдена, заносим значения в переменные и проверяем дальше
     barcode = data["barcode"]
@@ -77,14 +77,14 @@ async def handle_tsd_scan(request):
     # Проверка barcode на строку, содержатся ли только цифры и длина штрих-кода картриджа = 13
     if not isinstance(barcode, str) or not barcode.isdigit() or not(len(barcode) == 13):
         # Лог в консоль и ответ с ошибкой 400
-        logger.warning(f"Неверный json-формат. Поле barcode должно содержать только 13 цифр: {barcode}")
+        logger.warning(f"|   ТСД    |   Ошибка JSON   | Неверный json-формат. Поле barcode должно содержать только 13 цифр!")
         error_response = encrypt_data("Неверный json-формат. Поле barcode должно содержать только 13 цифр!")
         return web.Response(text=error_response, status=400)
 
     # Проверка action: только строка "add" или "red"
     if action not in ["add", "red"]:
         # Лог в консоль и ответ с ошибкой 400
-        logger.warning(f"Неверный json-формат. Поле action принимает только строку add или red: {action}")
+        logger.warning(f"|   ТСД    |   Ошибка JSON   | Поле action принимает только строку add или red: {action}")
         error_response = encrypt_data("Неверный json-формат. Поле action принимает только строку add или red!")
         return web.Response(text=error_response, status=400)
     # Проверка пройдена, action валиден, прибавляем или забираем картридж
@@ -103,8 +103,7 @@ async def handle_tsd_scan(request):
     # Обрабатываем результат: если вернулся кортеж из 2 элементов:
     if isinstance(db_operation_res, tuple) and len(db_operation_res) == 2:
         new_qty, name = db_operation_res
-        logger.info(f"|    ТСД   |   Обновлена БД  | Штрих-код: {barcode} | Имя: {name} | Количество: {new_qty}")
-
+        
         # Отправляем уведомление response_text в Telegram о успешном обновлении
         response_text = f"Штрих-код: {barcode}\nИмя: {name}\nДействие: {action}\nКоличество: {new_qty}"
         for user_id in user_ids:
@@ -121,8 +120,7 @@ async def handle_tsd_scan(request):
             # После NOT_FOUND: всегда будет штрих-код. 
             # Можно взять его и скопировать в barcode_not_found или barcode, который распарсили из json в запросе от ТСД, по факту не важно.
             barcode_not_found = db_operation_res.split(":", 1)[1]
-            logger.warning(f"|    ТСД   | Не обновлена БД | Не найден штрих-код в базе: {barcode_not_found}")
-            
+                        
             # 404 Требуемый ресурс не найден, отвечаем только ТСД
             response_text = f"Нет в базе: {barcode_not_found}"
             encrypted_response = encrypt_data(response_text)
@@ -132,8 +130,7 @@ async def handle_tsd_scan(request):
             # После NO_STOCK: всегда будет имя картриджа, у которого закончился или закончится запас после запрошенной операции.
             # В barcode_no_stock заносим имя картриджа
             barcode_no_stock = db_operation_res.split(":", 1)[1]
-            logger.warning(f"|    ТСД   | Не обновлена БД | Нет на складе или <0 после операции: {barcode_no_stock}")
-
+            
             # 409 Кофликт с состоянием базы, отвечаем только ТСД
             response_text = f"Нет на складе или <0 после операции!\nШтрих-код: {barcode_no_stock}"
             encrypted_response = encrypt_data(response_text)
