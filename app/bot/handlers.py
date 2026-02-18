@@ -329,8 +329,8 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
             # Если не ушел ответ тоже логируем
             try:
                 await message.answer(f"Операция не выполнена!\
-                                     \nПричина:              <b>нет в базе</b>.\
-                                     \nШтрих-код:        <b>{barcode_or_name}</b>",parse_mode="HTML")
+                                     \nПричина:         <b>нет в базе</b>.\
+                                     \nШтрих-код:     <b>{barcode_or_name}</b>",parse_mode="HTML")
             except Exception as e:
                 logger.warning(f"| TELEGRAM | НЕ ДОСТАВЛЕНО | "+ msg_text)
                 return None
@@ -498,7 +498,8 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
             line += f"\nИзменение:    {new_cartridge_data[4]}"
             line += f"\nID в базе:         {new_cartridge_data[0]}"
-            return await message.answer(f"{line}", parse_mode="HTML")
+            await message.answer(f"{line}", parse_mode="HTML")
+
         else:
             return await message.answer(f"Операция по добавлению не выполнена!\
                                 \nВозникла ошибка при вставке в базу.", parse_mode="HTML")

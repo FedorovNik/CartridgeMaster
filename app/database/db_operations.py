@@ -312,7 +312,7 @@ async def delete_cartridge(id: str):
             # Норм поведение
             if await db.execute(sql_req_barcodes,   (id,) ):
                 logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица barcodes        | Позиции с id={id} удалены!')
-            # Если косяк в sql запросе и переданном id     |  Таблица cartridges      |
+            # Если косяк в sql запросе и переданном id
             else:
                 logger.error(f'|  SQLITE  |     ОШИБКА      |  Таблица barcodes        | Позиции с id={id} не удалены!')
                 return False

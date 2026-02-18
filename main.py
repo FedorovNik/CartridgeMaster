@@ -19,7 +19,7 @@ async def main():
     logging.basicConfig(
         # %(name)-15s — зарезервировать 15 символов под имя логгера и выровнять по левому краю (-)
         # %(levelname)-8s — зарезервировать 8 символов под уровень (INFO, ERROR и т.д.)
-        format='%(asctime)s - %(name)-26s - %(levelname)-7s - %(message)s',
+        format='%(asctime)s | %(name)-26s | %(levelname)-7s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         level=logging.INFO
     )
@@ -48,7 +48,7 @@ async def main():
         web_runner = web.AppRunner(
             web_app, 
             access_log=custom_access_logger,
-            access_log_format='|   ТСД    |   %a   | %r      | Статус: %s' # IP, Запрос, Статус
+            access_log_format='|   ТСД    |   %a    | %r      | Статус: %s' # IP, Запрос, Статус
         )
         await web_runner.setup()
     except Exception:

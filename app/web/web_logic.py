@@ -62,12 +62,12 @@ async def handle_tsd_scan(request):
 
     ####################################### БЛОК ПРОВЕРОК ########################################################
     # Логируем весь полученный JSON в консоль
-    logger.info(f"|   ТСД    |   Получен JSON  | Расшировка: {data}")
+    logger.info(f"|   ТСД    |   ПОЛУЧЕН JSON  | Расшировка: {data}")
 
     # Базовая проверка на существование полей barcode и action в полученном JSON
     if "barcode" not in data or "action" not in data:
         # Если косяк то логируем и отвечаем ошибкой 400
-        logger.warning(f"|   ТСД    |   Ошибка JSON   | Неверный json-формат, поле barcode или action отсутствует!")
+        logger.warning(f"|   ТСД    |   ОШИБКА JSON   | Неверный json-формат, поле barcode или action отсутствует!")
         error_response = encrypt_data("Неверный json-формат. Поле barcode или action отсутствует!")
         return web.Response(text=error_response, status=400)
     # Простая проверка пройдена, заносим значения в переменные и проверяем дальше
@@ -77,14 +77,14 @@ async def handle_tsd_scan(request):
     # Проверка barcode на строку, содержатся ли только цифры и длина штрих-кода картриджа = 13
     if not isinstance(barcode, str) or not barcode.isdigit() or not(len(barcode) == 13):
         # Лог в консоль и ответ с ошибкой 400
-        logger.warning(f"|   ТСД    |   Ошибка JSON   | Неверный json-формат. Поле barcode должно содержать только 13 цифр!")
+        logger.warning(f"|   ТСД    |   ОШИБКА JSON   | Неверный json-формат. Поле barcode должно содержать только 13 цифр!")
         error_response = encrypt_data("Неверный json-формат. Поле barcode должно содержать только 13 цифр!")
         return web.Response(text=error_response, status=400)
 
     # Проверка action: только строка "add" или "red"
     if action not in ["add", "red"]:
         # Лог в консоль и ответ с ошибкой 400
-        logger.warning(f"|   ТСД    |   Ошибка JSON   | Поле action принимает только строку add или red: {action}")
+        logger.warning(f"|   ТСД    |   ОШИБКА JSON   | Поле action принимает только строку add или red: {action}")
         error_response = encrypt_data("Неверный json-формат. Поле action принимает только строку add или red!")
         return web.Response(text=error_response, status=400)
     # Проверка пройдена, action валиден, прибавляем или забираем картридж
@@ -105,11 +105,21 @@ async def handle_tsd_scan(request):
         new_qty, name = db_operation_res
         
         # Отправляем уведомление response_text в Telegram о успешном обновлении
-        response_text = f"Штрих-код: {barcode}\nИмя: {name}\nДействие: {action}\nКоличество: {new_qty}"
+        response_text = f"\nУведомление об операции ТСД:"
+        response_text += f"\nИмя:                 {name}"
+        response_text += f"\nКоличество:   {new_qty}"
+        response_text += f"\nШтрих-код:     {barcode}"
+        response_text += f"\nДействие:        {action}"
+
         for user_id in user_ids:
-            await bot.send_message(chat_id=user_id, text=f"{response_text}")
+            await bot.send_message(chat_id=user_id, text=f"{response_text}", parse_mode="HTML")
 
         # Ответ ТСД с кодом 200 и сообщением response_text
+        response_text = f"Имя:                 {name}"
+        response_text += f"\nКоличество:   {new_qty}"
+        response_text += f"\nШтрих-код:     {barcode}"
+        response_text += f"\nДействие:       {action}"
+
         encrypted_response = encrypt_data(response_text)
         return web.Response(text=encrypted_response, status=200)
     
