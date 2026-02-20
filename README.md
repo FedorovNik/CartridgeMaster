@@ -63,6 +63,9 @@ HTTP-сервер написан на aiohttp, работает в том же �
 
 pip install https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2/llama_cpp_python-0.3.2-cp311-cp311-win_amd64.whl
 
+Лучше взять эту, правильнее реагирует на излишние слова:
+[https://huggingface.co/hugging-quants/Llama-3.2-1B-Instruct-Q4_K_M-GGUF/tree/main](https://huggingface.co/hugging-quants/Llama-3.2-1B-Instruct-Q4_K_M-GGUF)
+
 Для тестов используется питоновское виртуальное окружение 3.11
 
 Ссылка на скачивание лок моделей:
