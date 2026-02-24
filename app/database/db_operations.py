@@ -227,6 +227,25 @@ async def get_cartridge_by_barcode(barcode: str):
             # Возвращаем кортеж из базы по нужной позиции или None, если ничего не найдено
             return await cursor.fetchone()
         
+# Поиск по ID
+# Используется подзапрос, т.к. сначала нужно найти ID картриджа и только потом выполнить JOIN по айдишнику
+# GROUP BY c.id обязательно, иначе будет сыпаться исключения в блоке обработки результатов. 
+# Если не нашлось ничего, то нужно вернуть None, а не кортеж из нонов..
+# Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по баркоду картриджа
+#             None, если не найдено        
+async def get_cartridge_by_id(barcode: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        sql_req = """
+            SELECT c.id, c.cartridge_name,  group_concat(b.barcode, '; ') as all_barcodes, c.quantity, c.last_update
+            FROM cartridges as c 
+            JOIN barcodes as b ON c.id == b.cartridge_id
+            WHERE c.id LIKE ?
+            GROUP BY c.id
+        """
+        async with db.execute(sql_req, (barcode,)) as cursor:
+            # Возвращаем кортеж из базы по нужной позиции или None, если ничего не найдено
+            return await cursor.fetchone()
+        
 # Обновляет параметр notice_enabled в базе пользователей, для включения/отключения уведомлений.
 # Изменяет базу, ничего не возвращает
 async def update_user_notice(telegram_id: int, notice_enabled: int):
@@ -275,8 +294,26 @@ async def insert_new_cartridge(barcode: str, cartridge_name: str, quantity: int)
 
         await db.commit()
         return True
-        
 
+# Создает новую строку в таблице barcodes по переданным параметрам.
+# Изменяет базу, возвращает True или False
+async def insert_new_barcode(barcode: str, cartridge_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        
+        # Запрос на вставку штрих кода и определенным ID картриджа в barcodes
+        sql_req_new_barcode = """
+                INSERT INTO barcodes (barcode, cartridge_id)
+                VALUES (?, ?)
+        """
+        try:
+            await db.execute(sql_req_new_barcode, (barcode, cartridge_id) )
+        except Exception as e:
+            logger.info(f'|  SQLITE  |    ИСКЛЮЧЕНИЕ   |  Таблица barcodes        | Вызвано исключение при попытке добавления нового штрих-кода!')
+            return None
+        logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица barcodes        | Добавление {barcode} для позиции с id={cartridge_id} выполнено!')
+
+        await db.commit()
+        return True
 
 # Поиск картриджа по id
 # Возвращает: кортеж (id, cartridge_name, all_barcodes, quantity, last_update) по ID картриджа

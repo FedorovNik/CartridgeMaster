@@ -16,7 +16,7 @@ from app.database.db_operations import add_user, get_all_users, user_exists, del
                                        get_all_cartridges, get_tg_id_list_notification,\
                                        get_cartridge_by_name, update_cartridge_count, update_user_notice,\
                                        get_cartridge_by_barcode, insert_new_cartridge, get_cartridge_by_id, \
-                                       delete_cartridge
+                                       delete_cartridge, insert_new_barcode
 import logging
 
 import socket
@@ -551,6 +551,62 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
             return await message.answer(f"Ошибка удаления из базы!\nПодробнее в серверных логах.", parse_mode="HTML")
     else:
         await message.answer(f"Картридж по этому ID не найден!")
+
+# Хэндлер для привязки штрих-кода к картриджу
+@rt.message(Command("addbar"))
+async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Message | None:
+    
+    if not command.args:
+        return await message.answer("Команда добавления штрих-кода для картриджа требует аргументов."
+                                "\n<b>/addbar BARCODE ID</b>"
+                                "\n\n<b>BARCODE</b>: принимает только новый штрих-код для картриджа."
+                                "\n<b>ID</b>: уникальный идентификатор картриджа, посмотреть можно выведя список /list"
+                                 "\n\nПример синтаксиса для связки штрикода с картриджем:"
+                                "\n/addbar <b>123456789123 13</b>",
+                                parse_mode="HTML")
+
+    # Нам нужно только два аргумента
+    parts: list[str] = command.args.split(maxsplit=1)
+    if len(parts) != 2:
+        return await message.answer("Неверное количество аргументов команды!")
+    barcode, id = parts
+
+    # Простые проверки аргументов
+    if not barcode.isdigit():
+        return await message.answer("Штрих-код должен состоять только из цифр!")
+    if not is_number(id):
+        return await message.answer("ID должен быть числом!")
+    if not( int(id) ):
+        return await message.answer("ID должен быть целым числом!")
+    if int(id) == 0:
+        return await message.answer("ID не может быть равен 0!")
+    
+    # Проверка связан ли переданный пользователем штрих-код с каким то картриджем
+    # Функция вернет кортеж для картриджа с этим баркодом и None, если нет
+    barcode_exist = await get_cartridge_by_barcode(barcode)
+    id_exist = await get_cartridge_by_id(id)
+
+    # Если вернется None - т.е. ID не найден, не добавляем
+    if not(id_exist):
+        return await message.answer(f"Такого ID нет в базе!", parse_mode="HTML")
+    
+    # Если вернется НЕ None - т.е. этот barcode уже есть в базе, не добавляем
+    if barcode_exist:
+        await message.answer(f"Этот штрих-код уже связан с картриджем!\nПодробная информация:", parse_mode="HTML")
+        line = f"\nИмя:                  <b>{barcode_exist[1]}</b>"
+        line += f"\nКоличество:   <b>{barcode_exist[3]}</b>"
+        barcodes_list = barcode_exist[2].split("; ")
+        for i in barcodes_list:
+            line += f"\nШтрих-код:     <b>{i}</b>"
+
+        line += f"\nИзменение:    <b>{barcode_exist[4]}</b>"
+        line += f"\nID в базе:         <b>{barcode_exist[0]}</b>"
+        return await message.answer(f"{line}", parse_mode="HTML")
+                
+    if await insert_new_barcode(barcode, id):
+        return await message.answer(f"Добавление штрих-кода {barcode} для картриджа с ID={id} выполнено", parse_mode="HTML")
+    else:
+        return await message.answer(f"Косяк, не выполнено!", parse_mode="HTML")
 
 # Этот хэндлер сработает на любое текстовое сообщение, 
 # которое не перехватили команды выше    
