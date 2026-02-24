@@ -554,7 +554,7 @@ async def insert(message: Message, command: CommandObject, bot:Bot) -> Message |
 
 # Хэндлер для привязки штрих-кода к картриджу
 @rt.message(Command("addbar"))
-async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Message | None:
+async def addbar(message: Message, command: CommandObject, bot:Bot) -> Message | None:
     
     if not command.args:
         return await message.answer("Команда добавления штрих-кода для картриджа требует аргументов."
@@ -576,8 +576,8 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
         return await message.answer("Штрих-код должен состоять только из цифр!")
     if not is_number(id):
         return await message.answer("ID должен быть числом!")
-    if not( int(id) ):
-        return await message.answer("ID должен быть целым числом!")
+    if not id.isdigit():
+        return await message.answer("ID должен состоять только из цифр!")
     if int(id) == 0:
         return await message.answer("ID не может быть равен 0!")
     
