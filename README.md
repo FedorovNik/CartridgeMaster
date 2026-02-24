@@ -76,6 +76,7 @@ pip install https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.2
 https://huggingface.co/hugging-quants/models
 
 ## ЗАМЕТКИ
-* Сделать удаление штрих-кодов /delbar BARCODE ID, но так, чтобы нельзя было удалить последний
-* Сделать добавление штрих-кодов /addbar BACODE ID
-* Попробовать уже развернуть в докере на proxmox, примонтировать файл базы
+1. Сделать удаление штрих-кодов /delbar BARCODE ID, но так, чтобы нельзя было удалить последни
+2. Сделать добавление штрих-кодов /addbar BACODE ID
+3. Вывод истории в телегу /showhistory START_DATE END_DATE. Лучше будет, чтобы тг бот формировал txt
+4. Попробовать уже развернуть в докере на proxmox, примонтировать файл базы
