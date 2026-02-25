@@ -374,3 +374,33 @@ async def delete_cartridge(id: str):
 
         await db.commit()
         return True
+
+# Удаление штрих-кода картриджа из таблицы. Если переданный штрих-код "единственный" у картриджа, он не удалится.
+async def delete_barcode(barcode: str, cartridge_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Сначала считаем сколько у айдишника всего их и заносим в переменную
+        sql_req_counting = """
+            SELECT COUNT(*)
+            FROM barcodes
+            WHERE cartridge_id = ?
+        """
+        count_of_barcodes = 1
+        async with db.execute(sql_req_counting,   (cartridge_id,) ) as cursor:
+            row = await cursor.fetchone()   # получаем строку
+            count_of_barcodes = row[0]
+        if count_of_barcodes > 1:
+            # Удаляем
+            sql_req_remove = """
+                DELETE
+                FROM barcodes
+                WHERE barcode = ?
+            """
+            await db.execute(sql_req_remove,   (barcode,) )
+            logger.info(f'|  SQLITE  |     УСПЕШНО     |  Таблица barcodes        | Штрих-код {barcode} у {cartridge_id} картриджа удален!')
+            await db.commit()
+            return True
+        else:
+            logger.warning(f'|  SQLITE  |     ОШИБКА      |  Таблица barcodes        | Штрих-код {barcode} у {cartridge_id} картриджа единственный!')
+            return False
+        
+        

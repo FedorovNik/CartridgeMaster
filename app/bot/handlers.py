@@ -16,7 +16,7 @@ from app.database.db_operations import add_user, get_all_users, user_exists, del
                                        get_all_cartridges, get_tg_id_list_notification,\
                                        get_cartridge_by_name, update_cartridge_count, update_user_notice,\
                                        get_cartridge_by_barcode, insert_new_cartridge, get_cartridge_by_id, \
-                                       delete_cartridge, insert_new_barcode
+                                       delete_cartridge, insert_new_barcode,delete_barcode
 import logging
 
 import socket
@@ -85,6 +85,8 @@ async def help(message: Message) -> None:
     f"<b>Работа с таблицей картриджей:\n</b>"
     f"<b>/list</b>\nВывести всю инфу по картриджам.\n"
     f"<b>/updatecount</b>\nОбновить количество определенного картриджа.\n"
+    f"<b>/addbar</b>\nДобавить штрих-код для определенного картриджа.\n"
+    f"<b>/delbar</b>\nУдалить штрих-код для определенного картриджа.\n"
     f"<b>/insert</b>\nДобавить новый картридж, отсутствующий в таблице.\n"
     f"<b>/delete</b>\nУдалить запись о картридже из таблицы.\n\n"
 
@@ -264,23 +266,30 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
     
     if not command.args:
         return await message.answer("Команда обновления количества картриджей в базе требует аргументов."
-                                "\n<b>/updatecount BARCODE CHANGE</b>"
-                                "\n\n<b>BARCODE</b>: принимает только штрих-код картриджа. Посмотреть все можно выведя список /list"
+                                "\n<b>/updatecount ID CHANGE</b>"
+                                "\n\n<b>ID</b>: принимает только уникальный ID картриджа. Посмотреть можно выведя список /list"
                                 "\n<b>CHANGE</b>: принимает положительные и отрицательные значения от -15 до 15."
                                 "Он определяет количество добавляемых картриджей в базу."
-                                "\n\nПример синтаксиса для добавления 2 шт картриджа TL-420:"
-                                "\n/updatecount <b>123456789123 +2</b>",
+                                "\n\nПример добавления двух картриджей с ID 5:"
+                                "\n/updatecount <b>5 +2</b>"
+                                "\nПример удаления двух картриджей с ID 5:"
+                                "\n/updatecount <b>5 -2</b>",
                                 parse_mode="HTML")
 
     # Нам нужно только два аргумента
     parts: list[str] = command.args.split(maxsplit=1)
     if len(parts) != 2:
         return await message.answer("Неверное количество аргументов команды!")
-    barcode, change = parts
+    cartridge_id, change = parts
 
     # Простые проверки аргументов
-    if not barcode.isdigit():
-        return await message.answer("Штрих-код должен состоять только из цифр!")
+    if not cartridge_id.isdigit():
+        return await message.answer("ID должен состоять только из цифр!")
+    if not is_number(cartridge_id):
+        return await message.answer("ID должно быть числом!")
+    if int(cartridge_id) == 0:
+        return await message.answer("ID=0 не может быть в базе!")
+    
     if not is_number(change):
         return await message.answer("Количество должно быть числом!")
     if not(-15 <= int(change) <= 15):
@@ -295,8 +304,18 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
     # Заготовка текста для answer
     msg_text: str = f"  TG_ID: {message.from_user.id}        | Имя: {message.from_user.first_name}"
 
+    # Получает кортеж по айдишнику
+    cartridge_res = await get_cartridge_by_id(cartridge_id)
+    if not(cartridge_res):
+        return await message.answer(f"Такого ID нет в базе!")
+    
+    # Когда переделаю функцию update_cartridge_count надо изменить тут всё, а пока будет костыль
+    # Берем 2 элемент(набор штрихкодов) из кортежа cartridge_res и делим по двоеточиям как отдельные элементы массива
+    # Берем первый попавшийся, без разницы какой они все принадлежат одному картриджу.
+    barcodes_list = cartridge_res[2].split("; ")
+
     # Вызываем функцию базы
-    db_operation_res: tuple[int, str] | str = await update_cartridge_count(barcode, int(change))
+    db_operation_res: tuple[int, str] | str = await update_cartridge_count(barcodes_list[0], int(change))
     
     # Обработка db_operation_res
     # Если вернулся кортеж из (new_qty, name)
@@ -606,7 +625,56 @@ async def addbar(message: Message, command: CommandObject, bot:Bot) -> Message |
     if await insert_new_barcode(barcode, id):
         return await message.answer(f"Добавление штрих-кода {barcode} для картриджа с ID={id} выполнено", parse_mode="HTML")
     else:
-        return await message.answer(f"Косяк, не выполнено!", parse_mode="HTML")
+        return await message.answer(f"Добавление не выполнено!", parse_mode="HTML")
+    
+@rt.message(Command("delbar"))
+async def delbar(message: Message, command: CommandObject, bot:Bot) -> Message | None:
+    
+    if not command.args:
+        return await message.answer("Команда добавления штрих-кода для картриджа требует аргументов."
+                                "\n<code><b>/delbar BARCODE ID</b></code>"
+                                "\n\n<b>BARCODE</b>: принимает только новый штрих-код для картриджа."
+                                "\n<b>ID</b>: уникальный идентификатор картриджа, посмотреть можно выведя список /list"
+                                 "\n\nПример синтаксиса для удаления штрикода у картриджа с ID 13:"
+                                "\n<code>/delbar 123456789123 13</code>",
+                                parse_mode="HTML")
+
+    # Нам нужно только два аргумента
+    parts: list[str] = command.args.split(maxsplit=1)
+    if len(parts) != 2:
+        return await message.answer("Неверное количество аргументов команды!")
+    barcode, id = parts
+
+    # Простые проверки аргументов
+    if not barcode.isdigit():
+        return await message.answer("Штрих-код должен состоять только из цифр!")
+    if not is_number(id):
+        return await message.answer("ID должен быть числом!")
+    if not id.isdigit():
+        return await message.answer("ID должен состоять только из цифр!")
+    if int(id) == 0:
+        return await message.answer("ID не может быть равен 0!")
+    
+    # Проверка связан ли переданный пользователем штрих-код с каким то картриджем
+    # Функция вернет кортеж для картриджа с этим баркодом и None, если нет
+    #barcode_exist = await get_cartridge_by_barcode(barcode)
+    cartridge = await get_cartridge_by_id(id)
+
+    # Если вернется None - т.е. картридж по ID не найден, выходим с сообщением
+    if not(cartridge):
+        return await message.answer(f"Такого ID нет в базе!", parse_mode="HTML")
+    else:
+        # Если вернется НЕ None - этот barcode есть в базе, можем удалять
+        barcodes_list = cartridge[2].split("; ")
+        if barcode in barcodes_list:
+            # Вызываем функцию удаления, вернет False если штрих единственный
+            bool_res = await delete_barcode(barcode, cartridge[0])
+            if bool_res:
+                return await message.answer(f"Удаление успешно выполнено!", parse_mode="HTML")
+            else:
+                return await message.answer(f"Единственный штрих-код нельзя удалить!", parse_mode="HTML")
+        else:
+            return await message.answer(f"Переданный штрих-код {barcode} не принадлежит картриджу с ID={cartridge[0]}!", parse_mode="HTML")
 
 # Этот хэндлер сработает на любое текстовое сообщение, 
 # которое не перехватили команды выше    
