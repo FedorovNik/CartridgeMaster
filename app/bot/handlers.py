@@ -171,7 +171,6 @@ async def list_users(message: Message) -> None:
 async def list_cartridges(message: Message) -> Message | SendMessage | None:
     # В cartridges копируем кортеж из (id, cartridge_name, quantity, all_barcodes, last_update) по каждому картриджу.
     cartridges: logging.Iterable[Row] = await get_all_cartridges()
-    #logger.info(cartridges)
     # Простая проверка на существование 
     if not cartridges:
         return await message.answer("Склад пуст!\
@@ -217,10 +216,22 @@ async def list_cartridges(message: Message) -> Message | SendMessage | None:
         line += f"ID в базе:         <b>{id}</b>\n"
         text_lines.append(line)
 
+    # Лимит на сообщение в ТГ 4096 символов    
+    # ПЕРЕПИСАТЬ ЭТУ ХРЕНЬ КОГДА ПРИДУМАЮ ЧТО-НИБУДЬ ПОЛУЧШЕ
     # Собираем полное сообщение из частей и отправляем его в ответ на команду /list
-    full_text = header + "\n".join(text_lines)
-    
-    await message.answer(full_text, parse_mode="HTML")
+    # Надо не превысить лимит телеги в 4096 символов
+
+    # Считаем половину элментов массива
+    half = int(len(text_lines)/2)
+    # Формируем строку из первой половины текста
+    one_half_text = header + "\n".join(text_lines[0:half:1])
+    # Формируем строку из второй половины текста
+    second_half_text = "\n".join(text_lines[half::1])
+    # Отправляем оба сообщения 
+    await message.answer(one_half_text, parse_mode="HTML")
+    await message.answer(second_half_text, parse_mode="HTML")
+
+    return
 
 
 @rt.message(Command("notice"))
@@ -309,7 +320,7 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
     if not(cartridge_res):
         return await message.answer(f"Такого ID нет в базе!")
     
-    # Когда переделаю функцию update_cartridge_count надо изменить тут всё, а пока будет костыль
+    #!!!!!!! Когда переделаю функцию update_cartridge_count чтобы она принимала айдишник а не штрих, тут надо изменить!!!!!!!!
     # Берем 2 элемент(набор штрихкодов) из кортежа cartridge_res и делим по двоеточиям как отдельные элементы массива
     # Берем первый попавшийся, без разницы какой они все принадлежат одному картриджу.
     barcodes_list = cartridge_res[2].split("; ")

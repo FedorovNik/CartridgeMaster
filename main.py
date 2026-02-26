@@ -48,7 +48,7 @@ async def main():
         web_runner = web.AppRunner(
             web_app, 
             access_log=custom_access_logger,
-            access_log_format='|   ТСД    |   %a    | %r      | Статус: %s' # IP, Запрос, Статус
+            access_log_format='|   ТСД    |   %a   | %r      | Статус: %s' # IP, Запрос, Статус
         )
         await web_runner.setup()
     except Exception:
