@@ -218,7 +218,7 @@ async def list_cartridges(message: Message, command: CommandObject) -> None:
                 f"Наименование: {cartridge_name}\n"
                 f"Количество: {quantity}"
             )
-            continue # Лучше пропустить этот проблемный пункт, но продолжить вывод остальных
+            continue
         
         # Формируем блок для одного картриджа
         line = f"{status_color}      <b>{cartridge_name}</b>\n"
@@ -369,11 +369,11 @@ async def updatecount(message: Message, command: CommandObject, bot:Bot) -> Mess
                                        \nИмя:                  <b>{cartridge_name}</b>\
                                        \nКоличество:   <b>{balance}</b>", parse_mode="HTML")
                 
-                logger.info(f"| TELEGRAM |    ДОСТАВЛЕНО   |" + msg_text)
+                logger.info(f"| TELEGRAM |    ДОСТАВЛЕНО   |" + f"  TG_ID: {user_id}        | Имя: пока нет инфы об имени")
             except Exception as e:
-                logger.warning(f"| TELEGRAM |  НЕ ДОСТАВЛЕНО  |"+ msg_text)
+                logger.warning(f"| TELEGRAM |  НЕ ДОСТАВЛЕНО  |" + f"  TG_ID: {user_id}        | Имя: пока нет инфы об имени")
                 return None
-            return
+        return
         
     # Обработка db_operation_res
     # Если вернулась строка: NOT_FOUND:BARCODE или NO_STOCK:CARTRIDGE_NAME
