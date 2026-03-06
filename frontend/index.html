@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Склад Картриджей</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 40px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #333; color: white; }
+        .barcode-badge { background: #eee; padding: 2px 6px; border-radius: 4px; margin-right: 5px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Список картриджей:</h1>
+        <table id="inv-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Наименование</th>
+                    <th>Штрихкоды</th>
+                    <th>Остаток</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        async function updateTable() {
+            const response = await fetch('/api/v1/cartridges');
+            const data = await response.json();
+            const tbody = document.querySelector('#inv-table tbody');
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const barcodes = item.barcodes.map(b => `<span class="barcode-badge">${b}</span>`).join('');
+                const row = `<tr>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${barcodes}</td>
+                    <td><strong>${item.stock}</strong></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+        updateTable();
+        setInterval(updateTable, 5000);
+    </script>
+</body>
+</html>
