@@ -1,3 +1,19 @@
+function showSection(sectionId, clickedBtn) {
+    // Скрываем все секции
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(sec => sec.classList.remove('active-section'));
+
+    // Убираем выделение (класс active) со всех кнопок меню
+    const buttons = document.querySelectorAll('.nav-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+
+    // Показываем нужную секцию
+    document.getElementById(sectionId).classList.add('active-section');
+
+    // Делаем нажатую кнопку активной (синей)
+    clickedBtn.classList.add('active');
+}
+
 async function updateTable() {
     const response = await fetch('/api/v1/cartridges');
     const data = await response.json();
@@ -100,5 +116,74 @@ function filterTable() {
         }
     });
 }
-updateTable();
-//setInterval(updateTable, 150000);
+
+
+// Главная функция обновления, которую вызываем при загрузке и по таймеру
+async function updateDashboard() {
+    try {
+        const response = await fetch('/api/v1/cartridges');
+        const data = await response.json();
+
+        // Заполняем обе таблицы разными функциями
+        renderSimpleList(data);
+        renderEditorList(data);
+    } catch (error) {
+        console.error('Ошибка загрузки данных:', error);
+    }
+}
+
+// ФУНКЦИЯ 1: Просто список с подсветкой критического остатка
+function renderSimpleList(data) {
+    const tbody = document.querySelector('#inv-table tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    data.forEach(item => {
+        // Проверка: если количество меньше минимума — добавляем класс 'low-stock'
+        const isLow = item.quantity < item.min_qty;
+        const qtyClass = isLow ? 'qty-value low-stock' : 'qty-value';
+
+        const row = `<tr>
+            <td>${item.id}</td>
+            <td>${item.name}</td>
+            <td><span class="${qtyClass}">${item.quantity}</span></td>
+            <td>${item.min_qty}</td>
+            
+            <td>${item.last_update}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+        //<td>${item.barcodes.map(b => `<span class="barcode-badge">${b}</span>`).join('')}</td>
+    });
+}
+
+// ФУНКЦИЯ 2: Редактор с кнопками +/- 
+function renderEditorList(data) {
+    const tbody = document.querySelector('#editor-table tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    data.forEach(item => {
+        const row = `<tr>
+            <td>${item.id}</td>
+            <td>${item.name}</td>
+            <td>
+                <div class="qty-controls">
+                    <button class="qty-btn" onclick="changeQty(this, ${item.id}, -1)">-</button>
+                    <span class="qty-value">${item.quantity}</span>
+                    <button class="qty-btn" onclick="changeQty(this, ${item.id}, 1)">+</button>
+                </div>
+            </td>
+            <td>${item.min_qty}</td>
+            <td>${item.barcodes.map(b => `<span class="barcode-badge">${b}</span>`).join('')}</td>
+            <td><span class="timedate_value">${item.last_update}</span></td>
+        </tr>`;
+        tbody.innerHTML += row;
+    });
+}
+
+
+
+// Вызов при загрузке страницы
+window.onload = updateDashboard;
+//updateTable();
+//setInterval(updateTable, 5000);

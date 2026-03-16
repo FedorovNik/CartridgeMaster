@@ -2,34 +2,84 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Тест</title>
+    <title>Cartridge Master</title>
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>тест форма редактора бд</h1>
-        <div class="search-container">
-            <input 
-                type="text" 
-                id="searchInput" 
-                oninput="filterTable()" 
-                placeholder="Фильтр поиска по названию" 
-                class="search-box"
-            >
-        </div>
-        <table id="inv-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Наименование</th>
-                    <th>Текущее количество</th>
-                    <th>Минимально необходимо</th>
-                    <th>Список штрих-кодов</th>
-                    <th>Последнее изменение</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Cartridge Master</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" onclick="showSection('section-list', this)">Список расходников</button>
+                <button class="nav-btn" onclick="showSection('section-editor', this)">Редактор БД</button>
+                <button class="nav-btn" onclick="showSection('section-3', this)">Графики расходов</button>
+                <button class="nav-btn" onclick="showSection('section-4', this)">Пользователи</button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            
+            <section id="section-list" class="content-section">
+                <div class="container">
+                    <h1>Список расходников</h1>
+                    <div class="search-container">
+                        <input type="text" id="searchInput" oninput="filterTable()" placeholder="Фильтр поиска по названию" class="search-box">
+                    </div>
+                    <table id="inv-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Наименование</th>
+                                <th>Текущее количество</th>
+                                <th>Минимально необходимо</th>
+                                
+                                <th>Последнее изменение</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="section-editor" class="content-section">
+                <div class="container">
+                    <h1>Редактор базы</h1>
+                    <div class="search-container">
+                        <input type="text" id="searchInput" oninput="filterTable()" placeholder="Фильтр поиска по названию" class="search-box">
+                    </div>
+                    <table id="editor-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Наименование</th>
+                                <th>Текущее количество</th>
+                                <th>Минимально необходимо</th>
+                                <th>Список штрих-кодов</th>
+                                <th>Последнее изменение</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="section-3" class="content-section">
+                <div class="container">
+                    <h1>Пользователи</h1>
+                    <p>тест</p>
+                </div>
+            </section>
+
+            <section id="section-4" class="content-section">
+                <div class="container">
+                    <h1>Уведомления</h1>
+                    <p>тест</p>
+                </div>
+            </section>
+
+        </main>
     </div>
 
     <script src="../js/app.js"></script>
