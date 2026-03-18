@@ -1,3 +1,14 @@
+"""
+CartridgeMaster - серверная часть приложения.
+
+Основная функциональность:
+- Веб-сервер с REST API (FastAPI) для управления запасами картриджей.
+- Асинхронная работа с локальной БД SQLite (aiosqlite)
+- Раздача HTML/CSS/JS фронта
+- AES шифрование при обмене данными с клиентским приложением на ТСД
+- Отправка уведомлений на почту
+"""
+
 from fastapi import FastAPI, status, Request, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,12 +33,26 @@ import aiosqlite
 import json
 import base64
 
+from db_logic import (
+    init_database,
+    get_cartridge_by_barcode,
+    get_cartridge_name_and_quantity,
+    get_cartridge_name,
+    update_cartridge_quantity_add,
+    update_cartridge_quantity_subtract,
+    get_all_cartridges,
+    get_cartridge_quantity,
+    update_cartridge_quantity,
+    add_history_record,
+    commit_changes,
+    DB_NAME as DB_NAME_IMPORT
+)
+
 
 AES_KEY = "My_Secret_Key_16"
 DB_NAME = "inventory.db"
 
-############################################## ЛОГГЕР #############################################################
-# 1. Создаем логгер
+#################################################### Логгер ###########################################################
 logger = logging.getLogger("my_custom_logger")
 logger.setLevel(logging.INFO)
 
@@ -38,7 +63,7 @@ logger.setLevel(logging.INFO)
 fmt = "%(asctime)s | %(levelprefix)s %(message)s"
 date_fmt = "%Y-%m-%d %H:%M:%S"
 
-# Используем именно DefaultFormatter из uvicorn.logging
+# DefaultFormatter из uvicorn.logging
 # use_colors=True для сохранения цветов
 formatter = DefaultFormatter(fmt, datefmt=date_fmt, use_colors=True)
 
@@ -46,7 +71,7 @@ formatter = DefaultFormatter(fmt, datefmt=date_fmt, use_colors=True)
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(formatter)
 
-# Очищаем старые хендлеры, если они были (чтобы не дублировать логи)
+# Очищаем старые хендлеры если они были (чтобы не дублировать логи)
 if logger.hasHandlers():
     logger.handlers.clear()
 
@@ -58,12 +83,15 @@ local_ip: str = socket.gethostbyname(hostname)
 logger.info(f"Имя хоста: {hostname}")
 logger.info(f"IP-адрес: {local_ip}")
 
-############################################## ЛОГГЕР #############################################################
+################################ Сет для временного хранения обработанных транзакций ##################################
+
 # Хранилище уникальных ID для каждого запроса от ТСД
 processed_requests = set()
-
-# Фоновая задача для очистки старых ID (раз в 6 часов, для тестов каждые 10 сек)
+# Фоновая задача для очистки старых ID (поставить потом раз в 6 часов и посмотреть сколько будет жрать ресурсов)
 async def clean_ids_task():
+    """
+    Очищает сет processed_requests раз в несколько часов
+    """
     while True:
         try:
             await asyncio.sleep(3600)
@@ -73,17 +101,15 @@ async def clean_ids_task():
         processed_requests.clear()
         logger.info(f"Набор недавних ID-транзакций от ТСД очищен. Удалено: {total_cleared}")
 
-# Lifespan - механизм управления жизненным циклом приложения, 
-# который позволяет выполнять код перед началом работы приложения и после
+
+###################################### LIFESPAN, код выполняемый до и после запуска uvicorn в main ###################
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ############ Установка соединения с базой ##########################
+    # Установка соединения с базой
     try:
         app.state.db = await aiosqlite.connect(DB_NAME)
-        # WAL для конкурентного доступа, но мб это избыточно
-        await app.state.db.execute("PRAGMA journal_mode=WAL;")
         logger.info("Соединение с БД установлено.")
-        # Закидываем в короткую переменную
+        # Закидываем состояние в короткую переменную
         db = app.state.db
         
     except Exception as e:
@@ -91,56 +117,24 @@ async def lifespan(app: FastAPI):
         # Выбрасываем ошибку дальше. Uvicorn её поймает и остановит запуск сервера.
         raise RuntimeError("Не удалось соединиться с базой данных!") from e
 
-    ############ Создание таблиц в базе если не существуют ############
-    # Картриджи
-    await db.execute("""
-        CREATE TABLE IF NOT EXISTS cartridges (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cartridge_name TEXT NOT NULL,
-            quantity INTEGER DEFAULT 0,
-            min_qty INTEGER DEFAULT 0,
-            last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # Штрихкоды
-    await db.execute("""
-        CREATE TABLE IF NOT EXISTS barcodes (
-            barcode TEXT PRIMARY KEY,
-            cartridge_id INTEGER NOT NULL,
-            FOREIGN KEY (cartridge_id) REFERENCES cartridges(id)
-        )
-    """)
-    # История изменений
-    await db.execute("""
-        CREATE TABLE IF NOT EXISTS history (
-            increment INTEGER PRIMARY KEY AUTOINCREMENT,
-            cartridge_id INTEGER NOT NULL,
-            cartridge_name TEXT NOT NULL,
-            delta INTEGER NOT NULL,
-            editor TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (cartridge_id) REFERENCES cartridges(id)
-        )
-    """)
-    logger.info(f"База данных проинициализована.")
-    await db.commit()
+    # Запускаем инициализацию бд
+    await init_database(db)
 
-    # Запуск при старте функции очистки сета айдишников транзакций ТСД
+    # Запуск функции периодической очистки сета айдишников запросов от ТСД
     asyncio.create_task(clean_ids_task())
 
     yield
-
     # Логика при остановке
+
     await db.close()
     logger.info(f"Соединение с БД закрыто.")
 
-
+############################################# FastAPI, объект app #######################################################
 app = FastAPI(lifespan=lifespan)
 # Монтажим папку с фронтом как /admin-ui
 app.mount("/admin-ui", StaticFiles(directory="frontend", html=True))
 
-
-# В FastApi нужен класс для описания структуры входящих данных.
+# Нужен класс для описания структуры входящих данных.
 # ТСД отправляет зашифрованный в base64 plain text, который после расшифровки представляет из себя json-структуру.
 # Схема для парсинга входящего JSON: {"payload": шифрострока}
 class ScanRequest(BaseModel):
@@ -150,8 +144,17 @@ class ScanRequest(BaseModel):
 class StockChange(BaseModel):
     change: int
 
-######################################### ШИФРАТОР И ДЕШИФРАТОР ДЛЯ ТСД ################################################
+############################################### Блок шифрования ТСД #####################################################
 def decrypt_payload(encrypted_b64: str):
+    """
+    Расшифровывает переданную строку encrypted_b64 по алгоритму AES и ключу 'AES_KEY'
+    
+    Args:
+        encrypted_b64: строка в base64
+       
+    Returns:
+        decrypted_bytes: расшифрованная строка в utf-8 или None
+    """
     try:
         # Декодируем из Base64
         combined = base64.b64decode(encrypted_b64)
@@ -169,6 +172,15 @@ def decrypt_payload(encrypted_b64: str):
     
 # Шифратор для ответа ТСД
 def encrypt_payload(data_str: str):
+    """
+    Шифрует переданную строку data_str по алгоритму AES и ключу 'AES_KEY'
+    
+    Args:
+        data_str: строка для шифрования
+       
+    Returns:
+        str: строка в base64
+    """
     # IV сгенерируется сам
     cipher = AES.new(AES_KEY.encode('utf-8'), AES.MODE_CBC) 
     ct_bytes = cipher.encrypt(pad(data_str.encode('utf-8'), AES.block_size))
@@ -180,7 +192,7 @@ def encrypt_payload(data_str: str):
 @app.post("/scan")
 # Объект data класса ScanRequest будет заполняться данными из тела запроса
 # C помощью Request получим состояние БД 
-async def process_scan(data: ScanRequest, request: Request):
+async def apiprocess_scan(data: ScanRequest, request: Request):
     # Получаем объект базы
     db = request.app.state.db
 
@@ -232,8 +244,7 @@ async def process_scan(data: ScanRequest, request: Request):
         req_action = inner_data.get('action') 
         
         # Ищем штрихкод
-        cursor = await db.execute("SELECT cartridge_id FROM barcodes WHERE barcode = ?", (req_barcode,))
-        row = await cursor.fetchone()
+        row = await get_cartridge_by_barcode(db, req_barcode)
         if not row:
             # Устанавливаем код 404 (Not Found)
             msg = f"Штрихкод {req_barcode} не привязан!"
@@ -244,20 +255,20 @@ async def process_scan(data: ScanRequest, request: Request):
 
         # Обновляем количество +1 в таблице cartridges
         if req_action == 'add':
-            await db.execute("UPDATE cartridges SET quantity = quantity + 1 WHERE id = ?", (cartridge_id,))
+            await update_cartridge_quantity_add(db, cartridge_id)
 
         # Обновляем количество -1 в таблице cartridges
         else:
-            cursor = await db.execute("UPDATE cartridges SET quantity = quantity - 1 WHERE id = ? AND stock > 0", (cartridge_id,))
+            cursor = await update_cartridge_quantity_subtract(db, cartridge_id)
             if cursor.rowcount == 0:
                 msg = "Ошибка: Остаток не может быть меньше нуля!"
                 return PlainTextResponse(encrypt_payload(msg), status_code=status.HTTP_409_CONFLICT)
             
-        await db.commit()
+        await commit_changes(db)
 
         # Получаем новый остаток для ответа
-        cursor = await db.execute("SELECT cartridge_name, quantity FROM cartridges WHERE id = ?", (cartridge_id,))
-        name, new_stock = await cursor.fetchone()
+        result = await get_cartridge_name_and_quantity(db, cartridge_id)
+        name, new_stock = result
 
         # Шифро-ответ ТСД: запрос обработан
         return PlainTextResponse(encrypt_payload(f"Имя: {name}\nШтрих-код:{req_barcode}\nОстаток: {new_stock}"))
@@ -266,46 +277,24 @@ async def process_scan(data: ScanRequest, request: Request):
         # Шифро-ответ ТСД: непонятный косяк на сервере
         return PlainTextResponse(encrypt_payload("Непредвиденная критическая ошибка сервера!"), status_code=500)
 
-################################## API для браузеров #############################################################
-# Джокушка локера от любопытных глаз
+############################################# API для браузеров #########################################################
+# Просто страничка для любопытных глаз
 @app.get("/scan")
-async def trap_page():
+async def api_get_trap_page():
     return FileResponse("frontend/pages/scan.html")
 
 # Клиент при отправке get на сервак получает index.html вместе со скриптом app.js.
-# app.js выполняет get запрос к api-сервера /api/v1/cartridges 
+# app.js выполняется клиентом и отпр get запрос к api-сервера /api/v1/cartridges 
 @app.get("/api/v1/cartridges")
-async def get_inventory(request: Request):
+async def api_get_all_cartridges(request: Request):
+    # Дергаем "сохраненное" состояние подключения к базе
     db = request.app.state.db
-    # волшебный запрос к базе
-    cursor = await db.execute("""
-        SELECT 
-            c.id, 
-            c.cartridge_name,
-            c.quantity,
-            c.min_qty,
-            c.last_update, 
-            GROUP_CONCAT(DISTINCT b.barcode) as barcodes
-        FROM cartridges c
-        LEFT JOIN barcodes b ON c.id = b.cartridge_id
-        GROUP BY c.id
-    """)
-    rows = await cursor.fetchall()
-    # Возвращаем чистый json
-    return [
-        {
-            "id": r[0],
-            "name": r[1],
-            "quantity": r[2],
-            "min_qty": r[3],
-            "last_update": r[4],
-            "barcodes": r[5].split(",") if r[4] else []
-            
-        } for r in rows
-    ]
+
+    cartridges = await get_all_cartridges(db)
+    return cartridges
 
 @app.patch("/api/v1/cartridges/{cartridge_id}/stock")
-async def update_cartridge_stock(cartridge_id: int, payload: StockChange, request: Request):
+async def api_patch_cartridge_quantity(cartridge_id: int, payload: StockChange, request: Request):
     # Собираем инфу о клиенте из request
     client_host = request.client.host
     user_agent = request.headers.get("User-Agent")
@@ -313,16 +302,11 @@ async def update_cartridge_stock(cartridge_id: int, payload: StockChange, reques
     client_info = os_info + client_host
     # Дергаем "сохраненное" состояние подключения к базе
     db = request.app.state.db
+    
     # Получаем текущее количество
-    async with db.execute(
-        "SELECT quantity FROM cartridges WHERE id = ?", 
-        (cartridge_id,)
-    ) as cursor:
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Картридж не найден!")
-        
-        current_stock = row[0]
+    current_stock = await get_cartridge_quantity(db, cartridge_id)
+    if current_stock is None:
+        raise HTTPException(status_code=404, detail="Картридж не найден!")
     
     # Вычисляем новый остаток и не даем ему уйти в минус
     new_stock = current_stock + payload.change
@@ -332,40 +316,24 @@ async def update_cartridge_stock(cartridge_id: int, payload: StockChange, reques
         return {"new_stock": new_stock}
     
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # Обновляем таблицу cartridges
-    await db.execute(
-        "UPDATE cartridges SET quantity = ?, last_update = ? WHERE id = ?", 
-        (new_stock, current_time, cartridge_id)
-    )
     
-    # Записываем действие в update_history для сохранения истории движения
-    # Структура полей может немного отличаться в зависимости от твоей схемы, 
-    # здесь пример записи ID картриджа, изменения и итогового остатка
-    async with db.execute(
-        "SELECT cartridge_name FROM cartridges WHERE id = ?", 
-        (cartridge_id,)
-    ) as cursor:
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Косяк!")
-        
-        cartridge_name = row[0]
-
-    await db.execute(
-        """
-        INSERT INTO history (cartridge_id, cartridge_name, delta, editor, created_at) 
-        VALUES (?, ?, ?, ?, ?)
-        """, 
-        (cartridge_id, cartridge_name, payload.change, client_info, current_time)
-    )
+    # Обновляем таблицу cartridges
+    await update_cartridge_quantity(db, cartridge_id, new_stock, current_time)
+    
+    # Получаем название картриджа
+    cartridge_name = await get_cartridge_name(db, cartridge_id)
+    if not cartridge_name:
+        raise HTTPException(status_code=404, detail="Косяк!")
+    
+    # Записываем действие в историю
+    await add_history_record(db, cartridge_id, cartridge_name, payload.change, client_info, current_time)
     
     # Подтверждаем транзакцию
-    await db.commit()
-
+    await commit_changes(db)
     
     logger.info(f"{client_host}   - 'Картридж {cartridge_name} изменен на {payload.change}. Новый остаток: {new_stock}'")
     
-    # 5. Возвращаем клиенту обновленное значение
+    # Возвращаем клиенту обновленное значение
     return {
         "new_stock": new_stock,
         "last_update": current_time
@@ -373,16 +341,16 @@ async def update_cartridge_stock(cartridge_id: int, payload: StockChange, reques
 
 # Перенаправление пользователя на файл админки    
 @app.get("/")
-async def root_redirect():
+async def redirect():
     return RedirectResponse(url='/admin-ui/pages/')
 
 # Перенаправление пользователя на файл админки
 @app.get("/admin-ui")
-async def root_redirect():
+async def redirect():
     return RedirectResponse(url='/admin-ui/pages/')
 
 
-################################## ЗАПУСК UVICORN #############################################################
+###################################### Его величество main запускает uvicorn ############################################
 if __name__ == "__main__":
     # Настраиваем формат: Дата Время | Уровень | Сообщение
     log_config = copy.deepcopy(uvicorn.config.LOGGING_CONFIG)
