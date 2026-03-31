@@ -291,6 +291,77 @@ async def add_history_record(db: aiosqlite.Connection, cartridge_id: int,
         (cartridge_id, cartridge_name, delta, editor, timestamp)
     )
 
+
+async def get_yearly_expense_heatmap(db: aiosqlite.Connection, year: int):
+    """
+    Собирает данные для тепловой карты расходов по картриджам за выбранный год.
+    Учитываются только отрицательные значения delta из таблицы history.
+
+    Args:
+        db: Подключение к БД
+        year: Год, за который нужно построить тепловую карту
+
+    Returns:
+        Словарь с полями:
+        - series: список серий для ApexCharts heatmap
+        - available_years: годы, для которых уже есть данные списаний
+    """
+    month_labels = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    years_cursor = await db.execute(
+        """
+        SELECT DISTINCT CAST(strftime('%Y', created_at) AS INTEGER) AS year_value
+        FROM history
+        WHERE delta < 0 AND created_at IS NOT NULL
+        ORDER BY year_value DESC
+        """
+    )
+    year_rows = await years_cursor.fetchall()
+    available_years = [row[0] for row in year_rows if row[0] is not None]
+
+    cursor = await db.execute(
+        """
+        SELECT cartridge_name,
+               CAST(strftime('%m', created_at) AS INTEGER) AS month_value,
+               SUM(ABS(delta)) AS total_spent
+        FROM history
+        WHERE delta < 0
+          AND created_at IS NOT NULL
+          AND strftime('%Y', created_at) = ?
+        GROUP BY cartridge_id, cartridge_name, month_value
+        ORDER BY cartridge_name COLLATE NOCASE ASC, month_value ASC
+        """,
+        (str(year),)
+    )
+    rows = await cursor.fetchall()
+
+    grouped = {}
+    for cartridge_name, month_value, total_spent in rows:
+        if cartridge_name not in grouped:
+            grouped[cartridge_name] = [0] * 12
+
+        if month_value and 1 <= month_value <= 12:
+            grouped[cartridge_name][month_value - 1] = total_spent
+
+    series = []
+    for cartridge_name, monthly_values in grouped.items():
+        series.append({
+            "name": cartridge_name,
+            "data": [
+                {"x": month_labels[index], "y": monthly_values[index]}
+                for index in range(12)
+            ]
+        })
+
+    return {
+        "series": series,
+        "available_years": available_years
+    }
+
+
 async def commit_changes(db: aiosqlite.Connection):
     """
     Сохраняет все изменения в БД

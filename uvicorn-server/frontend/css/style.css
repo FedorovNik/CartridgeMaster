@@ -557,6 +557,57 @@ details[open] .editor-card-summary::after {
     background: #fbfdff;
 }
 
+.analysis-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.analysis-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 220px;
+}
+
+.analysis-field > span {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.date-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cfd8e3;
+    border-radius: 10px;
+    font-size: 15px;
+    background: #ffffff;
+}
+
+.analysis-btn {
+    white-space: nowrap;
+}
+
+.analysis-summary {
+    margin: 0 0 16px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.chart-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.heatmap-host {
+    min-height: 320px;
+}
+
 .low-stock {
     color: var(--danger-text);
 }
@@ -622,6 +673,11 @@ details[open] .editor-card-summary::after {
 
     .editor-actions {
         align-items: stretch;
+    }
+
+    .analysis-field,
+    .analysis-btn {
+        width: 100%;
     }
 
     .save-btn {

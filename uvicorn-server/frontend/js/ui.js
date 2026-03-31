@@ -19,6 +19,11 @@ function showSection(sectionId, clickedBtn) {
 
     document.getElementById(sectionId).classList.add('active-section');
     clickedBtn.classList.add('active');
+
+    // При открытии вкладки анализа сразу подгружаем тепловую карту за выбранный год.
+    if (sectionId === 'section-analysis' && typeof loadExpenseHeatmap === 'function') {
+        loadExpenseHeatmap();
+    }
 }
 
 /**

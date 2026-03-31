@@ -60,15 +60,31 @@
             <section id="section-analysis" class="content-section">
                 <div class="container">
                     <h1>Анализ расходов</h1>
-                    <p>тест</p>
+                    <p class="page-intro">Тепловая карта показывает списания картриджей по месяцам. Учитываются только отрицательные значения `delta` из таблицы `history`.</p>
+
+                    <div class="analysis-toolbar">
+                        <label class="analysis-field">
+                            <span>Год анализа</span>
+                            <select id="analysisYear" class="date-input"></select>
+                        </label>
+
+                        <button type="button" id="analysisBuildBtn" class="save-btn analysis-btn">Построить карту</button>
+                    </div>
+
+                    <p id="analysisSummary" class="analysis-summary">Выберите год и нажмите кнопку, чтобы построить тепловую карту расходов.</p>
+
+                    <div class="chart-panel">
+                        <div id="expenseHeatmap" class="heatmap-host"></div>
+                    </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <script src="../js/render.js" defer></script>
-    <script src="../js/ui.js" defer></script>
-    <script src="../js/api.js" defer></script>
-    <script src="../js/app.js" defer></script>
+    <script src="../js/apexcharts-bundle/dist/apexcharts.min.js" defer></script>
+    <script src="../js/render.js?v=20260331-heatmap" defer></script>
+    <script src="../js/ui.js?v=20260331-heatmap" defer></script>
+    <script src="../js/api.js?v=20260331-heatmap" defer></script>
+    <script src="../js/app.js?v=20260331-heatmap" defer></script>
 </body>
 </html>

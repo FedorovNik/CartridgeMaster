@@ -1,13 +1,34 @@
 /**
  * APP.JS
  * Это точка входа фронтенда.
- * Здесь почти нет логики: файл просто запускает первое обновление интерфейса,
- * когда страница полностью загрузилась.
+ * Здесь инициализируется страница после полной загрузки:
+ * - загружается основной список картриджей
+ * - настраивается блок анализа расходов
  */
 
-// Как только страница и скрипты готовы, запрашиваем данные с сервера
-// и рисуем карточки на экране.
-window.onload = updateDashboard;
+/**
+ * Подготавливает элементы управления для вкладки анализа расходов.
+ * По умолчанию в селекте ставится текущий год, а по кнопке строится карта.
+ */
+function initializeAnalysisControls() {
+    const yearSelect = document.getElementById('analysisYear');
+    const buildBtn = document.getElementById('analysisBuildBtn');
+    const currentYear = new Date().getFullYear();
+
+    if (yearSelect && !yearSelect.value) {
+        yearSelect.innerHTML = `<option value="${currentYear}">${currentYear}</option>`;
+        yearSelect.value = String(currentYear);
+    }
+
+    if (buildBtn) {
+        buildBtn.addEventListener('click', loadExpenseHeatmap);
+    }
+}
+
+window.onload = function() {
+    initializeAnalysisControls();
+    updateDashboard();
+};
 
 // Если когда-нибудь понадобится автообновление данных,
 // можно раскомментировать строку ниже.

@@ -157,6 +157,61 @@ async function addBarcode(btn) {
 }
 
 /**
+ * Заполняет выпадающий список годов для анализа расходов.
+ * Если данных еще нет, все равно оставляем в списке выбранный год.
+ *
+ * @param {Array<number>} years - доступные годы из истории расходов
+ * @param {number} selectedYear - год, который должен быть выбран сейчас
+ */
+function fillAnalysisYearOptions(years, selectedYear) {
+    const yearSelect = document.getElementById('analysisYear');
+    if (!yearSelect) return;
+
+    const safeYears = Array.isArray(years) && years.length > 0 ? years : [selectedYear];
+    yearSelect.innerHTML = safeYears.map(year => {
+        const selectedAttr = Number(year) === Number(selectedYear) ? ' selected' : '';
+        return `<option value="${year}"${selectedAttr}>${year}</option>`;
+    }).join('');
+}
+
+/**
+ * Загружает данные для тепловой карты расходов по выбранному году.
+ * Учитываются только отрицательные delta из таблицы history.
+ */
+async function loadExpenseHeatmap() {
+    const yearSelect = document.getElementById('analysisYear');
+    const buildBtn = document.getElementById('analysisBuildBtn');
+    if (!yearSelect) return;
+
+    const selectedYear = parseInt(yearSelect.value, 10) || new Date().getFullYear();
+
+    if (buildBtn) {
+        buildBtn.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/api/v1/history/expenses/heatmap?year=${selectedYear}`);
+
+        if (!response.ok) {
+            console.error('Ошибка при загрузке тепловой карты расходов!');
+            alert('Не удалось построить тепловую карту расходов.');
+            return;
+        }
+
+        const data = await response.json();
+        fillAnalysisYearOptions(data.available_years || [], data.selected_year || selectedYear);
+        renderExpenseHeatmap(data.series || [], data.selected_year || selectedYear, data.total_spent || 0);
+    } catch (error) {
+        console.error('Ошибка загрузки тепловой карты:', error);
+        alert('Ошибка сети при построении карты расходов.');
+    } finally {
+        if (buildBtn) {
+            buildBtn.disabled = false;
+        }
+    }
+}
+
+/**
  * Загружает данные картриджей с сервера и обновляет обе вкладки карточек
  */
 async function updateDashboard() {

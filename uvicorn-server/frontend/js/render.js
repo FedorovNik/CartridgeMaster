@@ -77,6 +77,100 @@ function renderBarcodes(item) {
     `).join('');
 }
 
+// Экземпляр тепловой карты ApexCharts хранится здесь,
+// чтобы при повторном построении корректно удалить старую карту и нарисовать новую.
+let expenseHeatmapInstance = null;
+
+/**
+ * Рисует тепловую карту расходов по картриджам за выбранный год.
+ * По оси X идут месяцы, по оси Y — названия картриджей.
+ *
+ * @param {Array} series - подготовленные серии для ApexCharts
+ * @param {number|string} selectedYear - выбранный год анализа
+ * @param {number} totalSpent - общий расход за год
+ */
+function renderExpenseHeatmap(series, selectedYear, totalSpent) {
+    const chartHost = document.getElementById('expenseHeatmap');
+    const summary = document.getElementById('analysisSummary');
+    if (!chartHost || !summary) return;
+
+    const safeSeries = Array.isArray(series) ? series : [];
+
+    if (expenseHeatmapInstance) {
+        expenseHeatmapInstance.destroy();
+        expenseHeatmapInstance = null;
+    }
+
+    chartHost.innerHTML = '';
+
+    if (typeof ApexCharts === 'undefined') {
+        summary.textContent = 'Локальная библиотека ApexCharts не загрузилась, поэтому тепловая карта недоступна.';
+        return;
+    }
+
+    if (safeSeries.length === 0) {
+        summary.textContent = `За ${selectedYear} год в истории нет списаний, поэтому карта пустая.`;
+        return;
+    }
+
+    summary.textContent = `Год анализа: ${selectedYear}. Всего списано: ${totalSpent} шт.`;
+
+    const chartHeight = Math.max(320, safeSeries.length * 48 + 120);
+    const options = {
+        chart: {
+            type: 'heatmap',
+            height: chartHeight,
+            toolbar: {
+                show: true
+            }
+        },
+        series: safeSeries,
+        dataLabels: {
+            enabled: true,
+            formatter: function(value) {
+                return value > 0 ? value : '';
+            }
+        },
+        stroke: {
+            width: 1,
+            colors: ['#ffffff']
+        },
+        xaxis: {
+            type: 'category',
+            position: 'bottom'
+        },
+        legend: {
+            show: false
+        },
+        tooltip: {
+            y: {
+                formatter: function(value) {
+                    return `${value} шт`;
+                }
+            }
+        },
+        plotOptions: {
+            heatmap: {
+                shadeIntensity: 0.7,
+                radius: 4,
+                useFillColorAsStroke: false,
+                colorScale: {
+                    ranges: [
+                        { from: 0, to: 0, color: '#f3f4f6', name: 'Нет расхода' },
+                        { from: 1, to: 3, color: '#dbeafe', name: 'Низкий расход' },
+                        { from: 4, to: 8, color: '#93c5fd', name: 'Средний расход' },
+                        { from: 9, to: 15, color: '#60a5fa', name: 'Высокий расход' },
+                        { from: 16, to: 9999, color: '#1d4ed8', name: 'Очень высокий расход' }
+                    ]
+                }
+            }
+        }
+    };
+
+    expenseHeatmapInstance = new ApexCharts(chartHost, options);
+    expenseHeatmapInstance.render();
+}
+
 /**
  * Рисует вкладку "Список расходников".
  * Здесь карточки только для просмотра: без редактирования, только статус и основные данные.

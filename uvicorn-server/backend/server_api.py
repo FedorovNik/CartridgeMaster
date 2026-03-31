@@ -41,6 +41,7 @@ from server_db import (
     add_barcode,
     remove_barcode,
     add_history_record,
+    get_yearly_expense_heatmap,
     commit_changes
 )
 
@@ -324,6 +325,34 @@ async def api_remove_barcode(cartridge_id: int, barcode: str, request: Request):
         raise HTTPException(status_code=404, detail="Штрих-код не найден")
     await commit_changes(db)
     return {"message": "Штрих-код удалён"}
+
+
+@app.get("/api/v1/history/expenses/heatmap")
+async def api_get_expenses_heatmap(request: Request, year: Optional[int] = None):
+    """
+    Возвращает данные для тепловой карты расходов по картриджам.
+    В расчет попадают только отрицательные значения delta из history.
+    """
+    selected_year = year or datetime.now().year
+    db = request.app.state.db
+
+    result = await get_yearly_expense_heatmap(db, selected_year)
+    total_spent = 0
+    for series_item in result["series"]:
+        for point in series_item["data"]:
+            total_spent += point["y"]
+
+    available_years = result["available_years"]
+    if selected_year not in available_years:
+        available_years.insert(0, selected_year)
+        available_years = sorted(set(available_years), reverse=True)
+
+    return {
+        "selected_year": selected_year,
+        "available_years": available_years,
+        "series": result["series"],
+        "total_spent": total_spent
+    }
 
 # Перенаправление пользователя на файл админки    
 @app.get("/")
