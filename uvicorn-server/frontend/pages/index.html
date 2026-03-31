@@ -2,74 +2,57 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Cartridge Master</title>
     <link rel="icon" type="image/x-icon" href="../static/favicon.ico">
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/style.css?v=20260330-4">
 </head>
 <body>
     <div class="app-layout">
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2>Cartridge Master</h2>
+                <p>Учет картриджей и быстрый контроль остатков</p>
             </div>
             <nav class="sidebar-nav">
                 <button class="nav-btn active" onclick="showSection('section-list', this)">Список расходников</button>
                 <button class="nav-btn" onclick="showSection('section-editor', this)">Редактор БД</button>
-                <button class="nav-btn" onclick="showSection('section-users', this)">Пользователи</button>
+                <button class="nav-btn" onclick="showSection('section-post', this)">Почтовые смски</button>
                 <button class="nav-btn" onclick="showSection('section-analysis', this)">Анализ расходов</button>
             </nav>
         </aside>
 
         <main class="main-content">
-            
             <section id="section-list" class="content-section active-section">
                 <div class="container">
                     <h1>Список расходников</h1>
+                    <p class="page-intro">Раздел для отображения актуального количества по каждой позиции.<br>
+                        Поиск по регулярке - можно вводить не полностью.</p>
                     <div class="search-container">
-                        <input type="text" id="searchInput-1" oninput="filterTable_list()" placeholder="Фильтр поиска по названию" class="search-box">
+                        <input type="text" id="searchInput-1" oninput="filterTable_list()" placeholder="Поиск по названию" class="search-box">
                     </div>
-                    <table id="inv-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Наименование</th>
-                                <th>Текущее количество</th>
-                                <th>Минимально необходимо</th>
-                                
-                                <th>Последнее изменение</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                    <div id="inv-list" class="cards-grid" aria-live="polite"></div>
                 </div>
             </section>
 
             <section id="section-editor" class="content-section">
                 <div class="container">
                     <h1>Редактор базы</h1>
+                    <p class="page-intro">Раздел для редактирования всех позиций в базе.<br>
+                        Поиск по регулярке - можно вводить не полностью.</p>
                     <div class="search-container">
-                        <input type="text" id="searchInput-2" oninput="filterTable_edit()" placeholder="Фильтр поиска по названию" class="search-box">
+                        <input type="text" id="searchInput-2" oninput="filterTable_edit()" placeholder="Поиск по названию" class="search-box">
                     </div>
-                    <table id="editor-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Наименование</th>
-                                <th>Текущее количество</th>
-                                <th>Минимально необходимо</th>
-                                <th>Действия</th>
-                                <th>Список штрих-кодов</th>
-                                <th>Последнее изменение</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                    <div id="editor-list" class="cards-grid editor-grid" aria-live="polite"></div>
                 </div>
             </section>
 
-            <section id="section-users" class="content-section">
+            <section id="section-post" class="content-section">
                 <div class="container">
-                    <h1>Пользователи</h1>
+                    <h1>Почтовые смски</h1>
                     <p>тест</p>
                 </div>
             </section>
@@ -80,14 +63,12 @@
                     <p>тест</p>
                 </div>
             </section>
-
         </main>
     </div>
 
-    <!-- модули скриптоы для обмена  -->
-    <script src="../js/render.js"></script>
-    <script src="../js/ui.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/app.js"></script>
+    <script src="../js/render.js?v=20260330-4" defer></script>
+    <script src="../js/ui.js?v=20260330-4" defer></script>
+    <script src="../js/api.js?v=20260330-4" defer></script>
+    <script src="../js/app.js?v=20260330-4" defer></script>
 </body>
 </html>

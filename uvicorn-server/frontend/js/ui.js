@@ -10,18 +10,14 @@
  */
 function showSection(sectionId, clickedBtn) {
     updateDashboard();
-    // Скрываем все секции
+
     const sections = document.querySelectorAll('.content-section');
     sections.forEach(sec => sec.classList.remove('active-section'));
 
-    // Убираем выделение (класс active) со всех кнопок меню
     const buttons = document.querySelectorAll('.nav-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
 
-    // Показываем нужную секцию
     document.getElementById(sectionId).classList.add('active-section');
-
-    // Делаем нажатую кнопку активной
     clickedBtn.classList.add('active');
 }
 
@@ -44,59 +40,48 @@ function adjustNumber(btn, delta) {
     input.value = next < 0 ? 0 : next;
 }
 
-/**
- * Фильтрует таблицу "Список расходников" по названию
- * Вызывается при вводе текста в поле поиска
- */
-function filterTable_list() {
-    // Получаем то, что ввел пользователь, и переводим в нижний регистр
-    const searchValue = document.getElementById('searchInput-1').value.toLowerCase();
-    
-    // Получаем все строки таблицы
-    const rows = document.querySelectorAll('#inv-table tbody tr');
+function filterCards(inputId, selector) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
 
-    rows.forEach(row => {
-        // Берем конкретно вторую ячейку (td) в строке, где лежит имя
-        const nameCell = row.cells[1]; 
-        
-        // На всякий случай проверяем, есть ли ячейка чтобы не было ошибок на пустых строках
-        if (nameCell) {
-            // Берем текст только из ячейки с именем
-            const nameText = nameCell.textContent.toLowerCase();
-            if (nameText.includes(searchValue)) {
-                row.style.display = ''; 
-            } else {
-                row.style.display = 'none'; 
-            }
-        }
+    const searchValue = input.value.trim().toLowerCase();
+    const cards = document.querySelectorAll(selector);
+
+    cards.forEach(card => {
+        const nameText = (card.dataset.searchName || '').toLowerCase();
+        card.style.display = nameText.includes(searchValue) ? '' : 'none';
     });
 }
 
 /**
- * Фильтрует таблицу "Редактор БД" по названию
- * Вызывается при вводе текста в поле поиска
+ * Фильтрует карточки во вкладке "Список расходников"
+ */
+function filterTable_list() {
+    filterCards('searchInput-1', '#inv-list .cartridge-card');
+}
+
+/**
+ * Фильтрует карточки во вкладке "Редактор БД"
  */
 function filterTable_edit() {
-    // Получаем то, что ввел пользователь, и переводим в нижний регистр
-    const searchValue = document.getElementById('searchInput-2').value.toLowerCase();
-    
-    // Получаем все строки таблицы
-    const rows = document.querySelectorAll('#editor-table tbody tr');
+    filterCards('searchInput-2', '#editor-list .cartridge-card');
+}
 
-    rows.forEach(row => {
-        // Берем конкретно вторую ячейку (td) в строке, где лежит имя
-        const nameCell = row.cells[1]; 
-        
-        // На всякий случай проверяем, есть ли ячейка чтобы не было ошибок на пустых строках
-        if (nameCell) {
-            // Для редактора имя в input, берем value
-            const nameInput = nameCell.querySelector('input');
-            const nameText = nameInput ? nameInput.value.toLowerCase() : '';
-            if (nameText.includes(searchValue)) {
-                row.style.display = ''; 
-            } else {
-                row.style.display = 'none'; 
-            }
-        }
+/**
+ * Делает раскрытие карточек редактора более аккуратным: одна открыта, остальные закрыты
+ */
+function initializeEditorCards() {
+    const editorCards = document.querySelectorAll('#editor-list details.editor-card');
+
+    editorCards.forEach(card => {
+        card.addEventListener('toggle', () => {
+            if (!card.open) return;
+
+            editorCards.forEach(otherCard => {
+                if (otherCard !== card) {
+                    otherCard.removeAttribute('open');
+                }
+            });
+        });
     });
 }

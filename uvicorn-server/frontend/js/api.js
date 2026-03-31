@@ -5,42 +5,34 @@
 
 /**
  * Сохраняет изменения количества, минимального уровня и имени для картриджа
- * @param {HTMLElement} btn - кнопка "Сохранить" в строке
+ * @param {HTMLElement} btn - кнопка "Сохранить" в карточке
  */
 async function saveRow(btn) {
-    // Находим строку таблицы
-    const row = btn.closest('tr');
-    if (!row) return;
+    const card = btn.closest('[data-cartridge-id]');
+    if (!card) return;
 
-    // Получаем ID картриджа из data-атрибута
-    const cartridgeId = row.dataset.cartridgeId;
+    const cartridgeId = card.dataset.cartridgeId;
     if (!cartridgeId) return;
 
-    // Находим элементы ввода
-    const nameInput = row.querySelector('.name-input');
-    const qtyInput = row.querySelector('.current-qty');
-    const minInput = row.querySelector('.min-qty');
-    const timeElement = row.querySelector('.timedate_value');
+    const nameInput = card.querySelector('.name-input');
+    const qtyInput = card.querySelector('.current-qty');
+    const minInput = card.querySelector('.min-qty');
+    const timeElement = card.querySelector('.timedate_value');
 
     if (!nameInput || !qtyInput || !minInput) return;
 
-    // Получаем и валидируем значения
     const newName = nameInput.value.trim();
     const newQuantity = parseInt(qtyInput.value, 10) || 0;
     const newMin = parseInt(minInput.value, 10) || 0;
 
-    // Проверяем, что имя не пустое
     if (!newName) {
         alert('Название не может быть пустым!');
         return;
     }
 
-    // Отключаем кнопку, чтобы предотвратить повторные клики
     btn.disabled = true;
 
     try {
-        // Отправляем PATCH запрос на сервер с новыми значениями
-        // Эта строка отправляет объект с новыми quantity, min_qty и name для обновления на сервере
         const response = await fetch(`/api/v1/cartridges/${cartridgeId}/stock`, {
             method: 'PATCH',
             headers: {
@@ -59,10 +51,8 @@ async function saveRow(btn) {
             return;
         }
 
-        // Получаем обновленные данные от сервера
         const data = await response.json();
 
-        // Обновляем поля ввода актуальными значениями
         if (typeof data.new_stock === 'number') {
             qtyInput.value = data.new_stock;
         }
@@ -73,13 +63,11 @@ async function saveRow(btn) {
             timeElement.innerText = data.last_update;
         }
 
-        // Обновляем всю таблицу для корректности подсветки и данных
         await updateDashboard();
     } catch (error) {
         console.error('Сетевая ошибка:', error);
         alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
     } finally {
-        // Включаем кнопку обратно
         btn.disabled = false;
     }
 }
@@ -169,20 +157,39 @@ async function addBarcode(btn) {
 }
 
 /**
- * Загружает данные картриджей с сервера и обновляет обе таблицы
+ * Загружает данные картриджей с сервера и обновляет обе вкладки карточек
  */
 async function updateDashboard() {
     try {
+        const listSearchInput = document.getElementById('searchInput-1');
+        const editorSearchInput = document.getElementById('searchInput-2');
+        const listSearchValue = listSearchInput ? listSearchInput.value : '';
+        const editorSearchValue = editorSearchInput ? editorSearchInput.value : '';
+        const openedCardIds = Array.from(document.querySelectorAll('#editor-list details[open]')).map(card => card.dataset.cartridgeId);
+
         const response = await fetch('/api/v1/cartridges');
         const data = await response.json();
 
-        // Очищаем поля поиска
-        document.getElementById('searchInput-1').value = '';
-        document.getElementById('searchInput-2').value = '';
-
-        // Заполняем обе таблицы разными функциями
         renderSimpleList(data);
         renderEditorList(data);
+        initializeEditorCards();
+
+        if (listSearchInput) {
+            listSearchInput.value = listSearchValue;
+            filterTable_list();
+        }
+
+        if (editorSearchInput) {
+            editorSearchInput.value = editorSearchValue;
+            filterTable_edit();
+        }
+
+        openedCardIds.forEach(id => {
+            const card = document.querySelector(`#editor-list details[data-cartridge-id="${id}"]`);
+            if (card) {
+                card.setAttribute('open', 'open');
+            }
+        });
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
     }
