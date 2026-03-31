@@ -115,6 +115,11 @@ class StockChange(BaseModel):
 # Объект data класса ScanRequest будет заполняться данными из тела запроса
 # C помощью Request получим состояние БД 
 async def apiprocess_scan(data: ScanRequest, request: Request):
+    # Собираем инфу о клиенте из request
+    client_host = request.client.host
+    user_agent = request.headers.get("User-Agent")
+    os_info = "Platform: Windows       " if "Windows" in user_agent else "Platform: Mobile/Other  "
+    client_info = os_info + client_host
     # Получаем объект базы
     db = request.app.state.db
 
@@ -175,22 +180,32 @@ async def apiprocess_scan(data: ScanRequest, request: Request):
         # Берем id по этому штрихкоду
         cartridge_id = row[0]
 
+        # Текущее время
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
         # Обновляем количество +1 в таблице cartridges
         if req_action == 'add':
             await update_cartridge_quantity_add(db, cartridge_id)
-
         # Обновляем количество -1 в таблице cartridges
         else:
             cursor = await update_cartridge_quantity_subtract(db, cartridge_id)
             if cursor.rowcount == 0:
                 msg = "Ошибка: Остаток не может быть меньше нуля!"
                 return PlainTextResponse(encrypt_payload(msg), status_code=status.HTTP_409_CONFLICT)
-            
-        await commit_changes(db)
-
-        # Получаем новый остаток для ответа
+                  
+        # Получаем новый остаток и имя для ответа
         result = await get_cartridge_name_and_quantity(db, cartridge_id)
         name, new_stock = result
+
+        # Обновление таблицы с историей
+        if req_action == 'add':
+            await add_history_record(db,cartridge_id,name,1,client_info,current_time)
+            logger.info(f"{client_host}   - 'TSD  ID: {cartridge_id} | Имя: {name} | Дельта:  1 | Кол-во: {new_stock}'")
+        else:
+            await add_history_record(db,cartridge_id,name,-1,client_info,current_time)
+            logger.info(f"{client_host}   - 'TSD  ID: {cartridge_id} | Имя: {name} | Дельта: -1 | Кол-во: {new_stock}'")
+
+        await commit_changes(db)
 
         # Шифро-ответ ТСД: запрос обработан
         return PlainTextResponse(encrypt_payload(f"Имя: {name}\nШтрих-код:{req_barcode}\nОстаток: {new_stock}"), status_code=status.HTTP_200_OK)
