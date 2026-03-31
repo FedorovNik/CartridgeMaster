@@ -1,5 +1,4 @@
 :root {
-    --sidebar-width: 260px;
     --bg: #eef3f9;
     --panel: #ffffff;
     --panel-soft: #f8fbff;
@@ -62,7 +61,7 @@ body {
 
 .sidebar-header {
     padding: 22px 20px 18px;
-    background: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.31);
 }
 
 .sidebar-header h2 {
@@ -242,7 +241,7 @@ h1 {
     align-items: center;
     justify-content: center;
     white-space: nowrap;
-    padding: 7px 11px;
+    padding: 15px 30px;
     border-radius: 999px;
     font-size: 0.9rem;
     font-weight: 700;
@@ -645,7 +644,6 @@ details[open] .editor-card-summary::after {
     }
 
     .card-top {
-        flex-direction: column;
         align-items: flex-start;
     }
 

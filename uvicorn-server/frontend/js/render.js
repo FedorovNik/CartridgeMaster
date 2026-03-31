@@ -110,11 +110,11 @@ function renderSimpleList(data) {
 
                 <div class="card-metrics">
                     <div class="metric">
-                        <span class="metric-label">Количество</span>
-                        <span class="metric-value">${item.quantity} шт</span>
+                        <span class="metric-label">Необходимый минимум</span>
+                        <span class="metric-value">${item.min_qty} шт</span>
                     </div>
                     <div class="metric">
-                        <span class="metric-label">Обновлено</span>
+                        <span class="metric-label">Последнее обновление</span>
                         <span class="metric-value">${escapeHtml(item.last_update || '—')}</span>
                     </div>
                 </div>
