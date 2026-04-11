@@ -698,34 +698,123 @@ details[open] .editor-card-summary::after {
         flex: 1 1 100%;
         padding: 12px;
     }
+}
 
-    .card-top {
-        align-items: flex-start;
-    }
+/* Стили страницы логина */
+.login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    background: radial-gradient(circle at top, rgba(37, 99, 235, 0.08), transparent 45%), var(--bg);
+}
 
-    .card-status {
-        align-self: flex-start;
-    }
+.login-form {
+    width: 100%;
+    max-width: 420px;
+    padding: 36px 28px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid rgba(59, 130, 246, 0.12);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+}
 
-    .qty-controls {
-        width: 100%;
-    }
+.login-form h1 {
+    margin-bottom: 6px;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+}
 
-    .qty-input {
-        flex: 1 1 auto;
-        max-width: none;
-    }
+.login-form p {
+    margin-bottom: 24px;
+    color: var(--muted);
+}
 
-    .add-barcode {
-        align-items: stretch;
-    }
+.form-group {
+    margin-bottom: 18px;
+}
 
-    .new-barcode-input {
-        flex-basis: 100%;
-    }
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #334155;
+}
 
-    .add-btn {
-        width: 100%;
-        border-radius: 10px;
-    }
+.form-group input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #d6e4ff;
+    border-radius: 12px;
+    background: #f8fbff;
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.form-group input:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 14px 16px;
+    background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.login-btn:hover {
+    transform: translateY(-1px);
+    background: linear-gradient(90deg, #1d4ed8 0%, #1e40af 100%);
+}
+
+.error-message {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+
+.card-top {
+    align-items: flex-start;
+}
+
+.card-status {
+    align-self: flex-start;
+}
+
+.qty-controls {
+    width: 100%;
+}
+
+.qty-input {
+    flex: 1 1 auto;
+    max-width: none;
+}
+
+.add-barcode {
+    align-items: stretch;
+}
+
+.new-barcode-input {
+    flex-basis: 100%;
+}
+
+.add-btn {
+    width: 100%;
+    border-radius: 10px;
 }

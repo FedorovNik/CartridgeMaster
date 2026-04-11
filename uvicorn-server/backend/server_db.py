@@ -55,6 +55,16 @@ async def init_database(db_connection):
             )
         """)
         
+        # Таблица сессий
+        await db_connection.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id TEXT PRIMARY KEY,
+                user_dn TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL
+            )
+        """)
+        
         await db_connection.commit()
         logger.info("База данных проинициализирована.")
         
@@ -371,4 +381,78 @@ async def commit_changes(db: aiosqlite.Connection):
     Returns:
         Ничего не возвращает, комитит изменение в базе
     """
+    await db.commit()
+
+
+################################### Функции для работы с сессиями ###################################################
+
+import uuid
+from datetime import datetime, timedelta
+
+async def create_session(db: aiosqlite.Connection, user_dn: str) -> str:
+    """
+    Создает новую сессию для пользователя
+    
+    Args:
+        db: Подключение к БД
+        user_dn: DN пользователя
+        
+    Returns:
+        session_id: Уникальный ID сессии
+    """
+    session_id = str(uuid.uuid4())
+    expires_at = datetime.now() + timedelta(hours=8)  # Сессия на 8 часов
+    
+    await db.execute(
+        "INSERT INTO sessions (session_id, user_dn, expires_at) VALUES (?, ?, ?)",
+        (session_id, user_dn, expires_at.isoformat())
+    )
+    await db.commit()
+    return session_id
+
+
+async def get_session(db: aiosqlite.Connection, session_id: str):
+    """
+    Получает информацию о сессии
+    
+    Args:
+        db: Подключение к БД
+        session_id: ID сессии
+        
+    Returns:
+        Кортеж (user_dn, expires_at) или None если сессия не найдена или истекла
+    """
+    cursor = await db.execute(
+        "SELECT user_dn, expires_at FROM sessions WHERE session_id = ?",
+        (session_id,)
+    )
+    row = await cursor.fetchone()
+    if row:
+        user_dn, expires_at_str = row
+        expires_at = datetime.fromisoformat(expires_at_str)
+        if datetime.now() < expires_at:
+            return user_dn, expires_at
+    return None
+
+
+async def delete_session(db: aiosqlite.Connection, session_id: str):
+    """
+    Удаляет сессию
+    
+    Args:
+        db: Подключение к БД
+        session_id: ID сессии
+    """
+    await db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+    await db.commit()
+
+
+async def cleanup_expired_sessions(db: aiosqlite.Connection):
+    """
+    Удаляет истекшие сессии
+    
+    Args:
+        db: Подключение к БД
+    """
+    await db.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now().isoformat(),))
     await db.commit()

@@ -42,8 +42,19 @@ from server_db import (
     remove_barcode,
     add_history_record,
     get_yearly_expense_heatmap,
-    commit_changes
+    commit_changes,
+    create_session,
+    get_session,
+    delete_session,
+    cleanup_expired_sessions
 )
+
+from domain_checkuser import check_user_in_group
+
+# Модели для аутентификации
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 logger = logging.getLogger("my_custom_logger")
 
@@ -64,6 +75,19 @@ async def clean_ids_task():
         total_cleared = len(processed_requests)
         processed_requests.clear()
         logger.info(f"Набор недавних ID-транзакций от ТСД очищен. Удалено: {total_cleared}")
+
+# Фоновая задача для очистки истекших сессий
+async def clean_expired_sessions_task(db):
+    """
+    Очищает истекшие сессии каждый час
+    """
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Каждый час
+            await cleanup_expired_sessions(db)
+            logger.info("Истекшие сессии очищены")
+        except Exception as e:
+            logger.error(f"Ошибка при очистке сессий: {e}")
 
 
 ###################################### LIFESPAN, код выполняемый до и после запуска uvicorn в main ###################
@@ -86,6 +110,9 @@ async def lifespan(app: FastAPI):
 
     # Запуск функции периодической очистки сета айдишников запросов от ТСД
     asyncio.create_task(clean_ids_task())
+    
+    # Запуск функции периодической очистки истекших сессий
+    asyncio.create_task(clean_expired_sessions_task(db))
 
     yield
     # Логика при остановке
@@ -95,6 +122,29 @@ async def lifespan(app: FastAPI):
 
 ############################################# FastAPI, объект app #######################################################
 app = FastAPI(lifespan=lifespan)
+
+# Middleware для проверки сессий
+@app.middleware("http")
+async def session_middleware(request: Request, call_next):
+    # Пропускаем эндпоинты логина и статические файлы
+    if request.url.path.startswith("/api/v1/login") or request.url.path.startswith("/admin-ui"):
+        response = await call_next(request)
+        return response
+    
+    # Проверяем сессию для API эндпоинтов
+    if request.url.path.startswith("/api/"):
+        session_id = request.cookies.get("session_id")
+        if not session_id:
+            return PlainTextResponse("Unauthorized", status_code=401)
+        
+        db = request.app.state.db
+        session = await get_session(db, session_id)
+        if not session:
+            return PlainTextResponse("Unauthorized", status_code=401)
+    
+    response = await call_next(request)
+    return response
+
 # Монтажим папку с фронтом как /admin-ui
 app.mount("/admin-ui", StaticFiles(directory="frontend", html=True))
 
@@ -109,6 +159,38 @@ class StockChange(BaseModel):
     new_quantity: Optional[int] = None
     new_min_qty: Optional[int] = None
     new_name: Optional[str] = None
+
+
+############################################# API для аутентификации ##################################################
+@app.post("/api/v1/login")
+async def login(data: LoginRequest, request: Request):
+    from fastapi.responses import Response
+    db = request.app.state.db
+    
+    # Проверяем пользователя через LDAP
+    if not check_user_in_group(data.username, data.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials or not in allowed group")
+    
+    # Создаем сессию
+    user_dn = f"{data.username}@nizhbel.internal"
+    session_id = await create_session(db, user_dn)
+    
+    # Устанавливаем куку с session_id
+    response = Response("Login successful")
+    response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=28800)  # 8 часов
+    return response
+
+
+@app.post("/api/v1/logout")
+async def logout(request: Request):
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        db = request.app.state.db
+        await delete_session(db, session_id)
+    
+    response = PlainTextResponse("Logged out")
+    response.delete_cookie("session_id")
+    return response
 
 
 ############################################# API для ТСД ##############################################################

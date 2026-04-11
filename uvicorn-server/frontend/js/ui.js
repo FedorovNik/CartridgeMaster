@@ -10,14 +10,15 @@
  */
 function showSection(sectionId, clickedBtn) {
     updateDashboard();
-
+    // Получаем все секции и убираем класс active-section у всех
     const sections = document.querySelectorAll('.content-section');
     sections.forEach(sec => sec.classList.remove('active-section'));
-
+    // Получаем все кнопки меню и убираем класс active у всех
     const buttons = document.querySelectorAll('.nav-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
-
+    // Ищем по переданному айдишнику нужную секцию и делаем её видимой
     document.getElementById(sectionId).classList.add('active-section');
+    // Добавляем inline стиль для нажатой кнопки
     clickedBtn.classList.add('active');
 
     // При открытии вкладки анализа сразу подгружаем тепловую карту за выбранный год.
