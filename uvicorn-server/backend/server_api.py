@@ -49,12 +49,13 @@ from server_db import (
     cleanup_expired_sessions
 )
 
-from domain_checkuser import check_user_in_group
+from server_auth import authenticate_user
 
 # Модели для аутентификации
 class LoginRequest(BaseModel):
     username: str
     password: str
+    auth_type: str = 'ldap'  # 'ldap' или 'local'
 
 logger = logging.getLogger("my_custom_logger")
 
@@ -167,12 +168,12 @@ async def login(data: LoginRequest, request: Request):
     from fastapi.responses import Response
     db = request.app.state.db
     
-    # Проверяем пользователя через LDAP
-    if not check_user_in_group(data.username, data.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials or not in allowed group")
+    # Проверяем пользователя через выбранный метод аутентификации
+    success, user_dn = authenticate_user(data.username, data.password, data.auth_type)
+    if not success:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Создаем сессию
-    user_dn = f"{data.username}@nizhbel.internal"
     session_id = await create_session(db, user_dn)
     
     # Устанавливаем куку с session_id

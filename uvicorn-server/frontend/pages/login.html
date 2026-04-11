@@ -15,7 +15,15 @@
         <div class="login-form">
             <h1>Cartridge Master</h1>
             <p>Войдите в систему</p>
+            
+            <div class="auth-tabs">
+                <button type="button" class="tab-btn active" onclick="switchAuthTab('ldap')">Домен</button>
+                <button type="button" class="tab-btn" onclick="switchAuthTab('local')">Администратор</button>
+            </div>
+            
             <form id="loginForm">
+                <input type="hidden" id="authType" name="auth_type" value="ldap">
+                
                 <div class="form-group">
                     <label for="username">Имя пользователя:</label>
                     <input type="text" id="username" name="username" required>
@@ -30,6 +38,6 @@
         </div>
     </div>
 
-    <script src="../js/login.js"></script>
+    <script src="../js/auth.js"></script>
 </body>
 </html>
