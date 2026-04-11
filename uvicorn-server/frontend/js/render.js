@@ -157,10 +157,10 @@ function renderExpenseHeatmap(series, selectedYear, totalSpent) {
                 colorScale: {
                     ranges: [
                         { from: 0, to: 0, color: '#f3f4f6', name: 'Нет расхода' },
-                        { from: 1, to: 3, color: '#dbeafe', name: 'Низкий расход' },
-                        { from: 4, to: 8, color: '#93c5fd', name: 'Средний расход' },
-                        { from: 9, to: 15, color: '#60a5fa', name: 'Высокий расход' },
-                        { from: 16, to: 9999, color: '#1d4ed8', name: 'Очень высокий расход' }
+                        { from: 1, to: 2, color: '#94b5fa', name: 'Низкий расход' },
+                        { from: 3, to: 5, color: '#5d7afa', name: 'Средний расход' },
+                        { from: 6, to: 8, color: '#2b2dc7', name: 'Высокий расход' },
+                        { from: 9, to: 9999, color: '#0e0469', name: 'Очень высокий расход' }
                     ]
                 }
             }
