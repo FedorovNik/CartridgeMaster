@@ -193,6 +193,21 @@ async def logout(request: Request):
     return response
 
 
+@app.get("/api/v1/me")
+async def get_me(request: Request):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    db = request.app.state.db
+    session = await get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    user_dn, _ = session
+    return {"user_dn": user_dn}
+
+
 ############################################# API для ТСД ##############################################################
 @app.post("/scan")
 # Объект data класса ScanRequest будет заполняться данными из тела запроса

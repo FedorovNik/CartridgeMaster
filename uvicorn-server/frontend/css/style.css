@@ -81,6 +81,51 @@ body {
     flex-direction: column;
     gap: 8px;
     padding: 12px;
+    flex: 1 1 auto;
+}
+
+.sidebar-user-info {
+    margin-top: 18px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+}
+
+.sidebar-user-label {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.72);
+    margin-bottom: 6px;
+}
+
+.sidebar-username {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.logout-btn {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    padding: 14px 16px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 700;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
 }
 
 .nav-btn {

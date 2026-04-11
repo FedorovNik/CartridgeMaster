@@ -16,14 +16,20 @@
             <div class="sidebar-header">
                 <h2>Cartridge Master</h2>
                 <p>Учет картриджей и быстрый контроль остатков</p>
+                <div class="sidebar-user-info">
+                    <span class="sidebar-user-label">Пользователь</span>
+                    <span id="sidebarUsername" class="sidebar-username">...</span>
+                </div>
             </div>
             <nav class="sidebar-nav">
                 <button class="nav-btn active" onclick="showSection('section-list', this)">Список расходников</button>
                 <button class="nav-btn" onclick="showSection('section-editor', this)">Редактор БД</button>
                 <button class="nav-btn" onclick="showSection('section-post', this)">Почтовые смски</button>
                 <button class="nav-btn" onclick="showSection('section-analysis', this)">Анализ расходов</button>
-                <button class="logout-btn" onclick="logout()">Выйти</button>
             </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            </div>
         </aside>
 
         <main class="main-content">

@@ -10,11 +10,17 @@ window.addEventListener('DOMContentLoaded', function() {
 
 async function checkAuth() {
     try {
-        // Пробуем загрузить данные, если сессия валидна
-        const response = await fetch('/api/v1/cartridges');
+        const response = await fetch('/api/v1/me');
         if (!response.ok) {
-            // Если не авторизован, перенаправляем на логин
             window.location.href = '/admin-ui/pages/login.html';
+            return;
+        }
+
+        const data = await response.json();
+        const username = data.user_dn ? data.user_dn.split('@')[0] : '';
+        const userElement = document.getElementById('sidebarUsername');
+        if (userElement) {
+            userElement.textContent = username || 'Неизвестен';
         }
     } catch (error) {
         console.error('Ошибка проверки аутентификации:', error);
