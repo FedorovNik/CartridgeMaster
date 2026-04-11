@@ -32,28 +32,36 @@ function showSection(sectionId, clickedBtn) {
  * @param {number} delta - изменение (+1 или -1)
  */
 function adjustNumber(btn, delta) {
+    // Находим ближайший родительский элемент с классом .qty-controls
     const wrapper = btn.closest('.qty-controls');
     if (!wrapper) return;
-
+    // Находим внутри этого wrapper input[type=number] и изменяем его значение
     const input = wrapper.querySelector('input[type="number"]');
     if (!input) return;
-
+    // Получаем текущее значение
     const current = parseInt(input.value, 10);
     if (Number.isNaN(current)) return;
-
+    // Вычисляем новое значение и не позволяем ему стать меньше 0
     const next = current + delta;
     input.value = next < 0 ? 0 : next;
 }
 
 function filterCards(inputId, selector) {
+    // Получаем значение из поля ввода и все карточки по селектору
     const input = document.getElementById(inputId);
+    // На всякий случай проверяем, что элемент найден
     if (!input) return;
-
+    // Обрезаем пробелы и приводим к нижнему регистру для нечувствительного поиска
     const searchValue = input.value.trim().toLowerCase();
+    // Получаем все карточки, которые нужно фильтровать по переданному селектору
     const cards = document.querySelectorAll(selector);
-
+    // Для каждой карточки проверяем.. 
     cards.forEach(card => {
+        // Содержит ли она в своем data-атрибуте search-name искомое значение.
+        // Если нет то загоняем пустоту в строку с именем
         const nameText = (card.dataset.searchName || '').toLowerCase();
+        // Если содержит, то делаем сброс её inline стиля, передавая ''
+        // Если нет - скрываем через display none
         card.style.display = nameText.includes(searchValue) ? '' : 'none';
     });
 }
