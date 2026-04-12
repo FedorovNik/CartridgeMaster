@@ -933,3 +933,128 @@ details[open] .editor-card-summary::after {
     width: 100%;
     border-radius: 10px;
 }
+
+/* Стили для раздела email уведомлений */
+.email-settings {
+    background: var(--panel);
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+}
+
+.setting-group {
+    margin-bottom: 16px;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 12px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.form-control {
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-soft);
+    font-size: 1rem;
+    width: 100%;
+    max-width: 300px;
+}
+
+input[type="time"].form-control {
+    font-family: inherit;
+}
+
+.email-list-section {
+    margin-bottom: 24px;
+}
+
+.email-list-section h2 {
+    margin-bottom: 16px;
+    color: var(--text);
+}
+
+.email-list {
+    background: var(--panel);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.email-item {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.email-item:last-child {
+    border-bottom: none;
+}
+
+.email-address {
+    flex: 1;
+    font-weight: 500;
+}
+
+.email-checkbox {
+    margin-right: 16px;
+}
+
+.email-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+}
+
+.delete-email-btn {
+    background: var(--danger-text);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.delete-email-btn:hover {
+    background: #a0261e;
+}
+
+.add-email-section h2 {
+    margin-bottom: 16px;
+    color: var(--text);
+}
+
+.add-email-form {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.add-email-form input {
+    flex: 1;
+    max-width: 400px;
+}
+
+.add-email-form button {
+    flex-shrink: 0;
+}

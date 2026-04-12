@@ -25,8 +25,30 @@ function initializeAnalysisControls() {
     }
 }
 
+/**
+ * Инициализирует раздел email уведомлений
+ */
+function initializeEmailSection() {
+    // Загружаем список email при показе секции
+    const postSection = document.getElementById('section-post');
+    if (postSection) {
+        // Используем MutationObserver для отслеживания видимости секции
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (postSection.classList.contains('active-section')) {
+                        loadEmailList();
+                    }
+                }
+            });
+        });
+        observer.observe(postSection, { attributes: true });
+    }
+}
+
 window.onload = function() {
     initializeAnalysisControls();
+    initializeEmailSection();
     updateDashboard();
 };
 

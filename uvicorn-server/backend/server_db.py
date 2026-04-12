@@ -65,6 +65,23 @@ async def init_database(db_connection):
             )
         """)
         
+        # Таблица email адресов для уведомлений
+        await db_connection.execute("""
+            CREATE TABLE IF NOT EXISTS emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email_address TEXT NOT NULL UNIQUE,
+                notifications_on BOOLEAN DEFAULT 0
+            )
+        """)
+        
+        # Таблица настроек
+        await db_connection.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        
         await db_connection.commit()
         logger.info("База данных проинициализирована.")
         
@@ -456,3 +473,201 @@ async def cleanup_expired_sessions(db: aiosqlite.Connection):
     """
     await db.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now().isoformat(),))
     await db.commit()
+
+
+################################### Функции для работы с email уведомлениями ###################################################
+
+async def get_all_emails(db: aiosqlite.Connection):
+    """
+    Получает все email адреса из базы
+    
+    Args:
+        db: Подключение к БД
+        
+    Returns:
+        Список словарей с email данными
+    """
+    cursor = await db.execute("SELECT id, email_address, notifications_on FROM emails ORDER BY email_address")
+    rows = await cursor.fetchall()
+    return [
+        {
+            "id": r[0],
+            "email_address": r[1],
+            "notifications_on": bool(r[2])
+        }
+        for r in rows
+    ]
+
+
+async def add_email(db: aiosqlite.Connection, email_address: str):
+    """
+    Добавляет новый email адрес
+    
+    Args:
+        db: Подключение к БД
+        email_address: Email адрес для добавления
+        
+    Returns:
+        ID нового email или None если ошибка
+    """
+    try:
+        cursor = await db.execute("INSERT INTO emails (email_address) VALUES (?)", (email_address,))
+        return cursor.lastrowid
+    except aiosqlite.IntegrityError:
+        return None  # Email уже существует
+
+
+async def update_email_notifications(db: aiosqlite.Connection, email_id: int, notifications_on: bool):
+    """
+    Обновляет статус уведомлений для email
+    
+    Args:
+        db: Подключение к БД
+        email_id: ID email
+        notifications_on: Включены ли уведомления
+    """
+    await db.execute("UPDATE emails SET notifications_on = ? WHERE id = ?", (int(notifications_on), email_id))
+
+
+async def delete_email(db: aiosqlite.Connection, email_id: int):
+    """
+    Удаляет email адрес
+    
+    Args:
+        db: Подключение к БД
+        email_id: ID email для удаления
+        
+    Returns:
+        Количество удаленных строк
+    """
+    cursor = await db.execute("DELETE FROM emails WHERE id = ?", (email_id,))
+    return cursor.rowcount
+
+
+async def get_emails_for_notifications(db: aiosqlite.Connection):
+    """
+    Получает список email адресов, для которых включены уведомления
+    
+    Args:
+        db: Подключение к БД
+        
+    Returns:
+        Список email адресов
+    """
+    cursor = await db.execute("SELECT email_address FROM emails WHERE notifications_on = 1")
+    rows = await cursor.fetchall()
+    return [r[0] for r in rows]
+
+
+async def get_low_stock_cartridges(db: aiosqlite.Connection):
+    """
+    Получает картриджи с низким запасом (quantity <= min_qty)
+    
+    Args:
+        db: Подключение к БД
+        
+    Returns:
+        Список словарей с данными картриджей
+    """
+    cursor = await db.execute("""
+        SELECT id, cartridge_name, quantity, min_qty 
+        FROM cartridges 
+        WHERE quantity <= min_qty 
+        ORDER BY cartridge_name
+    """)
+    rows = await cursor.fetchall()
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "quantity": r[2],
+            "min_qty": r[3]
+        }
+        for r in rows
+    ]
+
+
+################################### Функции для работы с настройками ###################################################
+
+async def get_setting(db: aiosqlite.Connection, key: str, default_value: str = ""):
+    """
+    Получает значение настройки
+    
+    Args:
+        db: Подключение к БД
+        key: Ключ настройки
+        default_value: Значение по умолчанию
+        
+    Returns:
+        Значение настройки или default_value
+    """
+    cursor = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = await cursor.fetchone()
+    return row[0] if row else default_value
+
+
+async def set_setting(db: aiosqlite.Connection, key: str, value: str):
+    """
+    Устанавливает значение настройки
+    
+    Args:
+        db: Подключение к БД
+        key: Ключ настройки
+        value: Значение настройки
+    """
+    await db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        (key, value)
+    )
+
+
+async def get_notification_schedule(db: aiosqlite.Connection):
+    """
+    Получает расписание отправки уведомлений
+    
+    Args:
+        db: Подключение к БД
+        
+    Returns:
+        Словарь с полями: day_of_week (0-6), time_hm (ЧЧ:ММ) или None если не установлено
+    """
+    day_cursor = await db.execute("SELECT value FROM settings WHERE key = 'notification_day'")
+    day_row = await day_cursor.fetchone()
+    
+    time_cursor = await db.execute("SELECT value FROM settings WHERE key = 'notification_time'")
+    time_row = await time_cursor.fetchone()
+    
+    if not day_row or not time_row:
+        return None
+    
+    return {
+        "day_of_week": int(day_row[0]),
+        "time_hm": time_row[0]
+    }
+
+
+async def set_notification_schedule(db: aiosqlite.Connection, day_of_week: int, time_hm: str):
+    """
+    Устанавливает расписание отправки уведомлений
+    
+    Args:
+        db: Подключение к БД
+        day_of_week: День недели (0-6, подедельник=1)
+        time_hm: Время в формате ЧЧ:ММ
+    """
+    import re
+    # Проверка формата времени
+    if not re.match(r"^\d{2}:\d{2}$", time_hm):
+        raise ValueError("Неверный формат времени. Используйте ЧЧ:ММ")
+    
+    if not (0 <= day_of_week <= 6):
+        raise ValueError("День недели должен быть от 0 до 6")
+    
+    await db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("notification_day", str(day_of_week))
+    )
+    await db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("notification_time", time_hm)
+    )

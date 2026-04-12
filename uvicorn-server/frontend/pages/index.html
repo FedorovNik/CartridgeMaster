@@ -64,7 +64,55 @@
             <section id="section-post" class="content-section">
                 <div class="container">
                     <h1>Почтовые смски</h1>
-                    <p>тест</p>
+                    <p class="page-intro">Управление email уведомлениями о низком запасе картриджей.</p>
+                    
+                    <!-- Настройки рассылки -->
+                    <div class="email-settings">
+                        <div class="setting-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enableNotifications" onchange="toggleNotifications()">
+                                <span class="checkmark"></span>
+                                Включить рассылку уведомлений
+                            </label>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="notificationDay">День недели для рассылки:</label>
+                            <select id="notificationDay" class="form-control" onchange="saveNotificationSchedule()">
+                                <option value="1">Понедельник</option>
+                                <option value="2">Вторник</option>
+                                <option value="3">Среда</option>
+                                <option value="4">Четверг</option>
+                                <option value="5">Пятница</option>
+                                <option value="6">Суббота</option>
+                                <option value="0">Воскресенье</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="notificationTime">Время для рассылки:</label>
+                            <input type="time" id="notificationTime" class="form-control" value="09:00" onblur="saveNotificationSchedule()">
+                        </div>
+                        
+                        <button type="button" id="sendTestNotification" class="save-btn" onclick="sendTestNotification()">Отправить сейчас</button>
+                    </div>
+                    
+                    <!-- Список email адресов -->
+                    <div class="email-list-section">
+                        <h2>Email адреса для рассылки</h2>
+                        <div id="emailList" class="email-list">
+                            <!-- Email адреса будут загружены динамически -->
+                        </div>
+                    </div>
+                    
+                    <!-- Добавление нового email -->
+                    <div class="add-email-section">
+                        <h2>Добавить новый email</h2>
+                        <div class="add-email-form">
+                            <input type="email" id="newEmailInput" placeholder="example@domain.com" class="form-control">
+                            <button type="button" id="addEmailBtn" class="save-btn" onclick="addEmail()">Добавить</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

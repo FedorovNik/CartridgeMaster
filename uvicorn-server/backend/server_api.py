@@ -46,8 +46,20 @@ from server_db import (
     create_session,
     get_session,
     delete_session,
-    cleanup_expired_sessions
+    cleanup_expired_sessions,
+    get_all_emails,
+    add_email,
+    update_email_notifications,
+    delete_email,
+    get_emails_for_notifications,
+    get_low_stock_cartridges,
+    get_setting,
+    set_setting,
+    get_notification_schedule,
+    set_notification_schedule
 )
+
+from server_post import send_low_stock_notifications
 
 from server_auth import authenticate_user
 
@@ -91,6 +103,56 @@ async def clean_expired_sessions_task(db):
             logger.error(f"Ошибка при очистке сессий: {e}")
 
 
+async def check_notification_schedule_task():
+    """
+    Проверяет расписание отправки уведомлений каждую минуту
+    """
+    from datetime import datetime
+    
+    last_sent_date = None  # Отслеживаем дату последней отправки для предотвращения дублей
+    
+    while True:
+        try:
+            await asyncio.sleep(60)  # Проверяем каждую минуту
+            
+            async with aiosqlite.connect(DB_NAME) as db:
+                schedule = await get_notification_schedule(db)
+                
+                if not schedule:
+                    continue  # Расписание не установлено
+                
+                current_time = datetime.now()
+                current_day = current_time.weekday()  # 0=Monday, 6=Sunday
+                current_time_hm = current_time.strftime("%H:%M")
+                
+                # Преобразуем day_of_week (1-7, где 1=Monday, 0=Sunday) в weekday (0-6)
+                schedule_day = schedule["day_of_week"]
+                if schedule_day == 0:  # Воскресенье (0 в нашей системе)
+                    schedule_day = 6
+                else:
+                    schedule_day = schedule_day - 1
+                
+                schedule_time = schedule["time_hm"]
+                
+                # Проверяем совпадение дня недели и времени
+                if current_day == schedule_day and current_time_hm == schedule_time:
+                    # Проверяем, что уведомление не отправлялось сегодня
+                    today_str = current_time.date().isoformat()
+                    if last_sent_date != today_str:
+                        # Отправляем уведомления
+                        emails = await get_emails_for_notifications(db)
+                        if emails:
+                            low_stock = await get_low_stock_cartridges(db)
+                            if low_stock:
+                                await send_low_stock_notifications(emails, low_stock)
+                                logger.info(f"Автоматическое уведомление отправлено {len(emails)} адресам")
+                        
+                        last_sent_date = today_str
+                
+        except Exception as e:
+            logger.error(f"Ошибка при проверке расписания уведомлений: {e}")
+
+
 ###################################### LIFESPAN, код выполняемый до и после запуска uvicorn в main ###################
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -114,6 +176,9 @@ async def lifespan(app: FastAPI):
     
     # Запуск функции периодической очистки истекших сессий
     asyncio.create_task(clean_expired_sessions_task(db))
+    
+    # Запуск функции проверки расписания отправки уведомлений
+    asyncio.create_task(check_notification_schedule_task())
 
     yield
     # Логика при остановке
@@ -160,6 +225,17 @@ class StockChange(BaseModel):
     new_quantity: Optional[int] = None
     new_min_qty: Optional[int] = None
     new_name: Optional[str] = None
+
+# Схемы для email уведомлений
+class EmailAddRequest(BaseModel):
+    email_address: str
+
+class EmailUpdateRequest(BaseModel):
+    notifications_on: bool
+
+# Схемы для настроек
+class SettingUpdateRequest(BaseModel):
+    value: str
 
 
 ############################################# API для аутентификации ##################################################
@@ -451,6 +527,179 @@ async def api_get_expenses_heatmap(request: Request, year: Optional[int] = None)
         "series": result["series"],
         "total_spent": total_spent
     }
+
+
+################################ API для email уведомлений ###################################################
+
+@app.get("/api/v1/emails")
+async def get_emails(request: Request):
+    """
+    Получить все email адреса для уведомлений
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            emails = await get_all_emails(db)
+            return {"emails": emails}
+    except Exception as e:
+        logger.error(f"Ошибка при получении email адресов: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.post("/api/v1/emails")
+async def add_new_email(email_data: EmailAddRequest, request: Request):
+    """
+    Добавить новый email адрес
+    """
+    try:
+        # Валидация email (простая проверка)
+        import re
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email_data.email_address):
+            raise HTTPException(status_code=400, detail="Неверный формат email адреса")
+
+        async with aiosqlite.connect(DB_NAME) as db:
+            email_id = await add_email(db, email_data.email_address)
+            if email_id is None:
+                raise HTTPException(status_code=409, detail="Email адрес уже существует")
+            await commit_changes(db)
+            return {"message": "Email адрес добавлен", "id": email_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении email: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.patch("/api/v1/emails/{email_id}")
+async def update_email(email_id: int, email_data: EmailUpdateRequest, request: Request):
+    """
+    Обновить настройки уведомлений для email
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            await update_email_notifications(db, email_id, email_data.notifications_on)
+            await commit_changes(db)
+            return {"message": "Настройки уведомлений обновлены"}
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении email: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.delete("/api/v1/emails/{email_id}")
+async def remove_email(email_id: int, request: Request):
+    """
+    Удалить email адрес
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            deleted_count = await delete_email(db, email_id)
+            if deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Email адрес не найден")
+            await commit_changes(db)
+            return {"message": "Email адрес удален"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении email: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.post("/api/v1/emails/send-notifications")
+async def send_notifications(request: Request):
+    """
+    Отправить уведомления о низком запасе картриджей
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            # Получить email адреса для уведомлений
+            emails = await get_emails_for_notifications(db)
+            if not emails:
+                return {"message": "Нет email адресов для уведомлений"}
+
+            # Получить картриджи с низким запасом
+            low_stock = await get_low_stock_cartridges(db)
+            if not low_stock:
+                return {"message": "Нет картриджей с низким запасом"}
+
+            # Отправить уведомления
+            sent_count = await send_low_stock_notifications(emails, low_stock)
+            return {"message": f"Уведомления отправлены на {sent_count} адресов"}
+    except Exception as e:
+        logger.error(f"Ошибка при отправке уведомлений: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+################################ API для настроек ###################################################
+
+@app.get("/api/v1/settings/{key}")
+async def get_setting_value(key: str, request: Request):
+    """
+    Получить значение настройки
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            value = await get_setting(db, key)
+            return {"key": key, "value": value}
+    except Exception as e:
+        logger.error(f"Ошибка при получении настройки {key}: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.put("/api/v1/settings/{key}")
+async def update_setting(key: str, setting_data: SettingUpdateRequest, request: Request):
+    """
+    Обновить значение настройки
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            await set_setting(db, key, setting_data.value)
+            await commit_changes(db)
+            return {"message": "Настройка обновлена"}
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении настройки {key}: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+################################ API для расписания уведомлений ###################################################
+
+class NotificationScheduleRequest(BaseModel):
+    day_of_week: int
+    time_hm: str
+
+
+@app.get("/api/v1/notification-schedule")
+async def get_notification_schedule_endpoint(request: Request):
+    """
+    Получить расписание отправки уведомлений
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            schedule = await get_notification_schedule(db)
+            if schedule:
+                return schedule
+            else:
+                return {"day_of_week": None, "time_hm": None}
+    except Exception as e:
+        logger.error(f"Ошибка при получении расписания: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.post("/api/v1/notification-schedule")
+async def set_notification_schedule_endpoint(schedule_data: NotificationScheduleRequest, request: Request):
+    """
+    Установить расписание отправки уведомлений
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            await set_notification_schedule(db, schedule_data.day_of_week, schedule_data.time_hm)
+            await commit_changes(db)
+            return {"message": "Расписание уведомлений установлено"}
+    except ValueError as e:
+        logger.error(f"Ошибка валидации расписания: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Ошибка при установке расписания: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
 
 # Перенаправление пользователя на файл админки    
 @app.get("/")

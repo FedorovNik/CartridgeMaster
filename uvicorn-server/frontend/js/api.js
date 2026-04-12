@@ -249,3 +249,249 @@ async function updateDashboard() {
         console.error('Ошибка загрузки данных:', error);
     }
 }
+/**
+ * Загружает список email адресов
+ */
+async function loadEmailList() {
+    try {
+        const response = await fetch('/api/v1/emails');
+        if (!response.ok) {
+            console.error('Ошибка при загрузке email списка!');
+            return;
+        }
+        
+        const data = await response.json();
+        renderEmailList(data.emails);
+        
+        // Загружаем настройки
+        await loadNotificationSettings();
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+    }
+}
+
+/**
+ * Отрисовывает список email адресов
+ */
+function renderEmailList(emails) {
+    const emailList = document.getElementById('emailList');
+    if (!emailList) return;
+    
+    if (!emails || emails.length === 0) {
+        emailList.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--muted);">Нет email адресов</p>';
+        return;
+    }
+    
+    emailList.innerHTML = emails.map(email => `
+        <div class="email-item">
+            <span class="email-address">${email.email_address}</span>
+            <label class="email-checkbox">
+                <input type="checkbox" 
+                       ${email.notifications_on ? 'checked' : ''} 
+                       onchange="toggleEmailNotifications(${email.id}, this.checked)">
+                В рассылке
+            </label>
+            <button class="delete-email-btn" onclick="deleteEmail(${email.id})">Удалить</button>
+        </div>
+    `).join('');
+}
+
+/**
+ * Добавляет новый email адрес
+ */
+async function addEmail() {
+    const input = document.getElementById('newEmailInput');
+    const btn = document.getElementById('addEmailBtn');
+    if (!input || !btn) return;
+    
+    const email = input.value.trim();
+    if (!email) {
+        alert('Введите email адрес');
+        return;
+    }
+    
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/v1/emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email_address: email })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            alert(error.detail || 'Ошибка при добавлении email');
+            return;
+        }
+        
+        input.value = '';
+        await loadEmailList();
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+/**
+ * Включает/выключает уведомления для email
+ */
+async function toggleEmailNotifications(emailId, enabled) {
+    try {
+        const response = await fetch(`/api/v1/emails/${emailId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ notifications_on: enabled })
+        });
+        
+        if (!response.ok) {
+            console.error('Ошибка при обновлении настроек уведомлений!');
+            alert('Не удалось обновить настройки. Попробуйте ещё раз.');
+            return;
+        }
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    }
+}
+
+/**
+ * Удаляет email адрес
+ */
+async function deleteEmail(emailId) {
+    if (!confirm('Вы уверены, что хотите удалить этот email адрес?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/emails/${emailId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            console.error('Ошибка при удалении email!');
+            alert('Не удалось удалить email. Попробуйте ещё раз.');
+            return;
+        }
+        
+        await loadEmailList();
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    }
+}
+
+/**
+ * Отправляет тестовое уведомление
+ */
+async function sendTestNotification() {
+    const btn = document.getElementById('sendTestNotification');
+    if (!btn) return;
+    
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/v1/emails/send-notifications', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            console.error('Ошибка при отправке уведомлений!');
+            alert('Не удалось отправить уведомления. Проверьте настройки.');
+            return;
+        }
+        
+        const data = await response.json();
+        alert(data.message);
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+/**
+ * Включает/выключает рассылку уведомлений (глобальная настройка)
+ */
+async function toggleNotifications() {
+    const checkbox = document.getElementById('enableNotifications');
+    if (!checkbox) return;
+    
+    // Глобальная настройка рассылки пока не реализована
+    // В будущем здесь можно добавить логику включения/выключения автоматической рассылки
+}
+
+/**
+ * Загружает настройки уведомлений
+ */
+async function loadNotificationSettings() {
+    try {
+        const response = await fetch('/api/v1/notification-schedule');
+        if (response.ok) {
+            const data = await response.json();
+            const daySelect = document.getElementById('notificationDay');
+            const timeInput = document.getElementById('notificationTime');
+            
+            if (daySelect && data.day_of_week !== null) {
+                daySelect.value = data.day_of_week;
+            }
+            
+            if (timeInput && data.time_hm) {
+                timeInput.value = data.time_hm;
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки настроек:', error);
+    }
+}
+
+/**
+ * Сохраняет день недели и время для уведомлений
+ */
+async function saveNotificationSchedule() {
+    const daySelect = document.getElementById('notificationDay');
+    const timeInput = document.getElementById('notificationTime');
+    
+    if (!daySelect || !timeInput) return;
+    
+    const day = parseInt(daySelect.value, 10);
+    const time = timeInput.value;
+    
+    // Проверяем, что время введено полностью (в формате ЧЧ:ММ)
+    if (!time || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+        // Не показываем alert, просто игнорируем неполное время
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/notification-schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                day_of_week: day, 
+                time_hm: time 
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Ошибка при сохранении расписания!', error);
+            alert('Ошибка: ' + (error.detail || 'Не удалось сохранить расписание.'));
+            return;
+        }
+        
+        alert('Расписание сохранено. Уведомления будут отправляться в ' + time);
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    }
+}
