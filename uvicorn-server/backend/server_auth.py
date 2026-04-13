@@ -96,7 +96,7 @@ def authenticate_user(username: str, password: str, auth_type: str = 'ldap') -> 
             return True, user_dn
     elif auth_type == 'local':
         if check_local_user(username, password):
-            user_dn = f"local:{username}"
+            user_dn = f"{username}@local"
             return True, user_dn
     
     return False, ""

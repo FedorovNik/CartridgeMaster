@@ -28,18 +28,24 @@ def _send_email_sync(recipient, subject, body):
         message["From"] = email_address
         message["To"] = recipient
         message["Subject"] = subject
-        message.attach(MIMEText(body, "plain"))
+        message.attach(MIMEText(body, "html"))
         
         text = message.as_string()
         server.sendmail(email_address, recipient, text)
         server.quit()
         
-        logger.info(f"Уведомление отправлено на {recipient}")
+        logger.info(f"'EMAIL: Уведомление отправлено на {recipient}'")
         return True
     except Exception as e:
-        logger.error(f"Ошибка при отправке на {recipient}: {e}")
+        logger.error(f"'EMAIL: Ошибка при отправке на {recipient}: {e}'")
         return False
 
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def send_low_stock_notifications(emails: list, low_stock_cartridges: list):
     """
@@ -55,14 +61,54 @@ async def send_low_stock_notifications(emails: list, low_stock_cartridges: list)
     if not emails or not low_stock_cartridges:
         return 0
     
-    # Создаем тело письма
-    body_lines = ["Уведомление о низком запасе картриджей:\n"]
+    # Формируем HTML-тело письма
+    html_body = """
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; color: #333333; }
+            .header { color: #2c3e50; }
+            table { border-collapse: collapse; width: 100%; max-width: 600px; margin-top: 15px; }
+            th, td { border: 1px solid #dddddd; padding: 10px; text-align: left; }
+            th { background-color: #f4f4f4; font-weight: bold; }
+            .qty-alert { color: #d9534f; font-weight: bold; }
+            .footer { margin-top: 25px; font-size: 0.85em; color: #777777; }
+        </style>
+    </head>
+    <body>
+        <h3 class="header">Список расходников для закупки:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Модель</th>
+                    <th>Текущее количество</th>
+                    <th>Необходимый минимум</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    # Добавляем строки таблицы для каждого картриджа
     for cartridge in low_stock_cartridges:
-        body_lines.append(f"- {cartridge['name']}: {cartridge['quantity']} шт. (мин: {cartridge['min_qty']} шт.)")
+        html_body += f"""
+                <tr>
+                    <td>{cartridge['name']}</td>
+                    <td class="qty-alert">{cartridge['quantity']}</td>
+                    <td>{cartridge['min_qty']}</td>
+                </tr>
+        """
+        
+    html_body += """
+            </tbody>
+        </table>
+        <div class="footer">
+            <p>Это уведомление сформировано автоматически, не отвечайте на него =)</p>
+        </div>
+    </body>
+    </html>
+    """
     
-    body = "\n".join(body_lines)
-    subject = "Уведомление о низком запасе картриджей"
-    
+    subject = "CartridgeMaster: отчёт о состоянии расходных материалов"
     sent_count = 0
     
     try:
@@ -72,7 +118,8 @@ async def send_low_stock_notifications(emails: list, low_stock_cartridges: list)
         
         tasks = []
         for recipient in emails:
-            task = loop.run_in_executor(executor, _send_email_sync, recipient, subject, body)
+            # Передаем html_body вместо обычного текста
+            task = loop.run_in_executor(executor, _send_email_sync, recipient, subject, html_body)
             tasks.append(task)
         
         results = await asyncio.gather(*tasks)

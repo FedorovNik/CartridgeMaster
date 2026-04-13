@@ -19,7 +19,8 @@ async function checkAuth() {
         }
         // Получаем имя пользователя из ответа и отображаем его в сайдбаре
         const data = await response.json();
-        const username = data.user_dn ? data.user_dn.split('@')[0] : '';
+        //const username = data.user_dn ? data.user_dn.split('@')[0] : '';
+        const username = data.user_dn || '';
         const userElement = document.getElementById('sidebarUsername');
         if (userElement) {
             userElement.textContent = username || 'Неизвестен';
