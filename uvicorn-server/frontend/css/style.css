@@ -1058,3 +1058,100 @@ input[type="time"].form-control {
 .add-email-form button {
     flex-shrink: 0;
 }
+
+/**
+ * Стили для добавления позиций
+ */
+.add-cartridge-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 600px;
+    padding: 30px;
+    background-color: var(--surface-color);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-control {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: inherit;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/**
+ * Стили для удаления позиций
+ */
+.delete-card {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    background-color: var(--surface-color);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.delete-card:hover {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
+}
+
+.delete-actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.delete-btn {
+    flex: 1;
+    padding: 12px 20px;
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-btn:hover {
+    background-color: #991b1b;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.delete-btn:active {
+    transform: scale(0.98);
+}
+
+.delete-btn:disabled {
+    background-color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+}

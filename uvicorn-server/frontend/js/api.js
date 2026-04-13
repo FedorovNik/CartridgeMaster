@@ -212,14 +212,16 @@ async function loadExpenseHeatmap() {
 }
 
 /**
- * Загружает данные картриджей с сервера и обновляет обе вкладки карточек
+ * Загружает данные картриджей с сервера и обновляет все вкладки карточек
  */
 async function updateDashboard() {
     try {
         const listSearchInput = document.getElementById('searchInput-1');
         const editorSearchInput = document.getElementById('searchInput-2');
+        const deleteSearchInput = document.getElementById('searchInput-3');
         const listSearchValue = listSearchInput ? listSearchInput.value : '';
         const editorSearchValue = editorSearchInput ? editorSearchInput.value : '';
+        const deleteSearchValue = deleteSearchInput ? deleteSearchInput.value : '';
         const openedCardIds = Array.from(document.querySelectorAll('#editor-list details[open]')).map(card => card.dataset.cartridgeId);
 
         const response = await fetch('/api/v1/cartridges');
@@ -227,6 +229,7 @@ async function updateDashboard() {
 
         renderSimpleList(data);
         renderEditorList(data);
+        renderDeleteList(data);
         initializeEditorCards();
 
         if (listSearchInput) {
@@ -237,6 +240,11 @@ async function updateDashboard() {
         if (editorSearchInput) {
             editorSearchInput.value = editorSearchValue;
             filterTable_edit();
+        }
+
+        if (deleteSearchInput) {
+            deleteSearchInput.value = deleteSearchValue;
+            filterTable_delete();
         }
 
         openedCardIds.forEach(id => {
@@ -493,5 +501,131 @@ async function saveNotificationSchedule() {
     } catch (error) {
         console.error('Сетевая ошибка:', error);
         alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    }
+}
+
+/**
+ * Добавляет новый картридж в базу данных
+ */
+async function addNewCartridge() {
+    const nameInput = document.getElementById('addCartridgeName');
+    const qtyInput = document.getElementById('addCartridgeQuantity');
+    const minQtyInput = document.getElementById('addCartridgeMinQty');
+    const barcodeInput = document.getElementById('addCartridgeBarcode');
+
+    if (!nameInput || !qtyInput || !minQtyInput || !barcodeInput) {
+        alert('Не удалось найти поля формы');
+        return;
+    }
+
+    const name = nameInput.value.trim();
+    const quantity = parseInt(qtyInput.value, 10) || 0;
+    const minQty = parseInt(minQtyInput.value, 10) || 1;
+    const barcode = barcodeInput.value.trim();
+
+    // Валидация
+    if (!name) {
+        alert('Введите название картриджа');
+        return;
+    }
+
+    if (minQty < 1) {
+        alert('Минимальный остаток должен быть не менее 1');
+        return;
+    }
+
+    if (!barcode) {
+        alert('Введите штрих-код');
+        return;
+    }
+
+    if (!/^\d{13}$/.test(barcode)) {
+        alert('Штрих-код должен состоять ровно из 13 цифр');
+        return;
+    }
+
+    if (quantity < 0) {
+        alert('Количество не может быть отрицательным');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/v1/cartridges', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cartridge_name: name,
+                quantity: quantity,
+                min_qty: minQty,
+                barcode: barcode
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Ошибка: ' + (error.detail || 'Не удалось добавить картридж'));
+            return;
+        }
+
+        const result = await response.json();
+        
+        // Очищаем форму
+        nameInput.value = '';
+        qtyInput.value = '0';
+        minQtyInput.value = '1';
+        barcodeInput.value = '';
+
+        alert('Картридж успешно добавлен');
+
+        // Обновляем данные
+        await updateDashboard();
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    }
+}
+
+/**
+ * Удаляет картридж из базы данных
+ * @param {HTMLElement} btn - кнопка "Удалить"
+ */
+async function deleteCartridge(btn) {
+    const card = btn.closest('[data-cartridge-id]');
+    if (!card) return;
+
+    const cartridgeId = card.dataset.cartridgeId;
+    const cartridgeName = card.dataset.cartridgeName || 'Неизвестный картридж';
+
+    if (!cartridgeId) return;
+
+    // Запрашиваем подтверждение
+    if (!confirm(`Вы действительно хотите удалить картридж "${cartridgeName}"?\n\nЭто действие необратимо. Все штрих-коды будут удалены.`)) {
+        return;
+    }
+
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`/api/v1/cartridges/${cartridgeId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Ошибка: ' + (error.detail || 'Не удалось удалить картридж'));
+            return;
+        }
+
+        alert('Картридж успешно удален');
+
+        // Обновляем данные
+        await updateDashboard();
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+    } finally {
+        btn.disabled = false;
     }
 }

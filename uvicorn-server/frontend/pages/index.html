@@ -27,7 +27,9 @@
             </div>
             <nav class="sidebar-nav">
                 <button class="nav-btn active" onclick="showSection('section-list', this)">Список расходников</button>
-                <button class="nav-btn" onclick="showSection('section-editor', this)">Редактор БД</button>
+                <button class="nav-btn" onclick="showSection('section-editor', this)">Редактор позиций</button>
+                <button class="nav-btn" onclick="showSection('section-add', this)">Добавление позиций</button>
+                <button class="nav-btn" onclick="showSection('section-delete', this)">Удаление позиций</button>
                 <button class="nav-btn" onclick="showSection('section-post', this)">Почтовые смски</button>
                 <button class="nav-btn" onclick="showSection('section-analysis', this)">Анализ расходов</button>
             </nav>
@@ -51,13 +53,51 @@
 
             <section id="section-editor" class="content-section">
                 <div class="container">
-                    <h1>Редактор базы</h1>
+                    <h1>Редактор позиций</h1>
                     <p class="page-intro">Раздел для редактирования всех позиций в базе.<br>
                         Поиск по регулярке - можно вводить не полностью.</p>
                     <div class="search-container">
                         <input type="text" id="searchInput-2" oninput="filterTable_edit()" placeholder="Поиск по названию" class="search-box">
                     </div>
                     <div id="editor-list" class="cards-grid editor-grid" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section id="section-add" class="content-section">
+                <div class="container">
+                    <h1>Добавление позиций</h1>
+                    <p class="page-intro">Добавьте новый картридж в базу данных с минимальным количеством поля.</p>
+                    <div class="add-cartridge-form">
+                        <div class="form-group">
+                            <label for="addCartridgeName">Название картриджа:</label>
+                            <input type="text" id="addCartridgeName" placeholder="Например: HP LaserJet Q2612A" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="addCartridgeQuantity">Количество:</label>
+                            <input type="number" id="addCartridgeQuantity" min="0" value="0" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="addCartridgeMinQty">Минимальный остаток:</label>
+                            <input type="number" id="addCartridgeMinQty" min="1" value="1" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="addCartridgeBarcode">Штрих-код (обязателен, 13 цифр):</label>
+                            <input type="text" id="addCartridgeBarcode" placeholder="0000000000000" class="form-control">
+                        </div>
+                        <button type="button" class="save-btn" onclick="addNewCartridge()">Добавить картридж</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-delete" class="content-section">
+                <div class="container">
+                    <h1>Удаление позиций</h1>
+                    <p class="page-intro">Удалите картридж из базы данных. Будут также удалены все связанные штрих-коды.<br>
+                        История операций с этим картриджом останется для отчетности.</p>
+                    <div class="search-container">
+                        <input type="text" id="searchInput-3" oninput="filterTable_delete()" placeholder="Поиск по названию" class="search-box">
+                    </div>
+                    <div id="delete-list" class="cards-grid" aria-live="polite"></div>
                 </div>
             </section>
 

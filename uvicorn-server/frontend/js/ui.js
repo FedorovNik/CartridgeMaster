@@ -75,10 +75,17 @@ function filterTable_list() {
 }
 
 /**
- * Фильтрует карточки во вкладке "Редактор БД"
+ * Фильтрует карточки во вкладке "Редактор позиций"
  */
 function filterTable_edit() {
     filterCards('searchInput-2', '#editor-list .cartridge-card');
+}
+
+/**
+ * Фильтрует карточки во вкладке "Удаление позиций"
+ */
+function filterTable_delete() {
+    filterCards('searchInput-3', '#delete-list .cartridge-card');
 }
 
 /**

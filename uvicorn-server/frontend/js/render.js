@@ -314,3 +314,54 @@ function renderEditorList(data) {
         `;
     }).join('');
 }
+
+/**
+ * Рисует вкладку "Удаление позиций".
+ * Здесь карточки в формате для удаления с подтверждением.
+ *
+ * @param {Array} data - массив картриджей из API
+ */
+function renderDeleteList(data) {
+    const list = document.getElementById('delete-list');
+    if (!list) return;
+
+    if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = '<div class="empty-state">Нет картриджей для удаления.</div>';
+        return;
+    }
+
+    list.innerHTML = data.map(item => {
+        const stockState = getStockState(item);
+
+        return `
+            <div class="cartridge-card delete-card ${stockState.className}" data-cartridge-id="${item.id}" data-cartridge-name="${escapeHtml(item.name)}" data-search-name="${escapeHtml(item.name.toLowerCase())}">
+                <div class="card-top">
+                    <div class="card-heading">
+                        <span class="card-id">ID ${item.id}</span>
+                        <h3 class="cartridge-name">${escapeHtml(item.name)}</h3>
+                    </div>
+                    <span class="card-status">${item.quantity} шт</span>
+                </div>
+
+                <div class="card-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Количество</span>
+                        <span class="metric-value">${item.quantity} шт</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Минимум</span>
+                        <span class="metric-value">${item.min_qty} шт</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Штрих-коды</span>
+                        <span class="metric-value">${item.barcodes && item.barcodes.length > 0 ? item.barcodes.length : 0}</span>
+                    </div>
+                </div>
+
+                <div class="delete-actions">
+                    <button type="button" class="delete-btn" onclick="deleteCartridge(this)">Удалить картридж</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}

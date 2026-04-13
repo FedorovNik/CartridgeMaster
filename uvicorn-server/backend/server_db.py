@@ -50,10 +50,17 @@ async def init_database(db_connection):
                 cartridge_name TEXT NOT NULL,
                 delta INTEGER NOT NULL,
                 editor TEXT NOT NULL,
+                username TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (cartridge_id) REFERENCES cartridges(id)
             )
         """)
+        
+        # Добавляем колонку username если её еще нет (для существующих БД)
+        try:
+            await db_connection.execute("ALTER TABLE history ADD COLUMN username TEXT")
+        except:
+            pass  # Колонка уже существует
         
         # Таблица сессий
         await db_connection.execute("""
@@ -296,7 +303,7 @@ async def update_cartridge_quantity(db: aiosqlite.Connection, cartridge_id: int,
 
 
 async def add_history_record(db: aiosqlite.Connection, cartridge_id: int, 
-                             cartridge_name: str, delta: int, editor: str, timestamp: str):
+                             cartridge_name: str, delta: int, editor: str, timestamp: str, username: str = None):
     """
     Добавляет запись в историю изменений
     
@@ -307,15 +314,16 @@ async def add_history_record(db: aiosqlite.Connection, cartridge_id: int,
         delta: Изменение количества (положительное или отрицательное)
         editor: Информация о редакторе (IP, платформа, и т.д.)
         timestamp: Время записи
+        username: Имя пользователя (опционально, для операций от пользователя через веб)
     Returns:
         Ничего не возвращает, выполняет операцию с базой
     """
     await db.execute(
         """
-        INSERT INTO history (cartridge_id, cartridge_name, delta, editor, created_at) 
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO history (cartridge_id, cartridge_name, delta, editor, username, created_at) 
+        VALUES (?, ?, ?, ?, ?, ?)
         """, 
-        (cartridge_id, cartridge_name, delta, editor, timestamp)
+        (cartridge_id, cartridge_name, delta, editor, username, timestamp)
     )
 
 
@@ -671,3 +679,65 @@ async def set_notification_schedule(db: aiosqlite.Connection, day_of_week: int, 
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
         ("notification_time", time_hm)
     )
+
+
+################################### Функции для создания и удаления картриджей ###################################################
+
+async def create_cartridge(db: aiosqlite.Connection, cartridge_name: str, quantity: int, 
+                          min_qty: int, barcode: str, timestamp: str) -> int:
+    """
+    Создает новый картридж и добавляет первый штрих-код
+    
+    Args:
+        db: Подключение к БД
+        cartridge_name: Название картриджа
+        quantity: Начальное количество
+        min_qty: Минимальный остаток
+        barcode: Первый штрих-код (обязателен)
+        timestamp: Время создания
+        
+    Returns:
+        ID нового картриджа
+    """
+    cursor = await db.execute(
+        """
+        INSERT INTO cartridges (cartridge_name, quantity, min_qty, last_update) 
+        VALUES (?, ?, ?, ?)
+        """,
+        (cartridge_name, quantity, min_qty, timestamp)
+    )
+    cartridge_id = cursor.lastrowid
+    
+    # Добавляем первый штрих-код
+    await db.execute(
+        "INSERT INTO barcodes (barcode, cartridge_id) VALUES (?, ?)",
+        (barcode, cartridge_id)
+    )
+    
+    return cartridge_id
+
+
+async def delete_cartridge(db: aiosqlite.Connection, cartridge_id: int) -> bool:
+    """
+    Удаляет картридж и все связанные штрих-коды
+    История операций с картриджем остается в таблице history
+    
+    Args:
+        db: Подключение к БД
+        cartridge_id: ID картриджа для удаления
+        
+    Returns:
+        True если картридж был удален, False если не найден
+    """
+    # Проверяем существование картриджа
+    result = await get_cartridge_by_id(db, cartridge_id)
+    if not result:
+        return False
+    
+    # Удаляем все штрих-коды
+    await db.execute("DELETE FROM barcodes WHERE cartridge_id = ?", (cartridge_id,))
+    
+    # Удаляем сам картридж
+    await db.execute("DELETE FROM cartridges WHERE id = ?", (cartridge_id,))
+    
+    return True

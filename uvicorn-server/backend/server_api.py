@@ -47,6 +47,8 @@ from server_db import (
     get_session,
     delete_session,
     cleanup_expired_sessions,
+    create_cartridge,
+    delete_cartridge,
     get_all_emails,
     add_email,
     update_email_notifications,
@@ -225,6 +227,13 @@ class StockChange(BaseModel):
     new_quantity: Optional[int] = None
     new_min_qty: Optional[int] = None
     new_name: Optional[str] = None
+
+# Схема для создания нового картриджа
+class CartridgeCreateRequest(BaseModel):
+    cartridge_name: str
+    quantity: int
+    min_qty: int
+    barcode: str
 
 # Схемы для email уведомлений
 class EmailAddRequest(BaseModel):
@@ -415,6 +424,19 @@ async def api_patch_cartridge_quantity(cartridge_id: int, payload: StockChange, 
     # Дергаем "сохраненное" состояние подключения к базе
     db = request.app.state.db
 
+    # Получаем имя пользователя из сессии
+    session_id = request.cookies.get("session_id")
+    username = None
+    if session_id:
+        session_data = await get_session(db, session_id)
+        if session_data:
+            user_dn = session_data[0]
+            # Извлекаем имя пользователя из DN
+            if "cn=" in user_dn:
+                username = user_dn.split("cn=")[1].split(",")[0]
+            else:
+                username = user_dn
+
     # Получаем текущее количество и минимальное количество
     row = await get_cartridge_stock_and_min(db, cartridge_id)
     if not row:
@@ -456,7 +478,7 @@ async def api_patch_cartridge_quantity(cartridge_id: int, payload: StockChange, 
     # Записываем действие в историю, если изменилось количество
     delta = new_stock - current_stock
     if delta != 0:
-        await add_history_record(db, cartridge_id, new_name, delta, client_info, current_time)
+        await add_history_record(db, cartridge_id, new_name, delta, client_info, current_time, username)
 
     # Подтверждаем транзакцию
     await commit_changes(db)
@@ -698,6 +720,123 @@ async def set_notification_schedule_endpoint(schedule_data: NotificationSchedule
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Ошибка при установке расписания: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.post("/api/v1/cartridges")
+async def api_create_cartridge(payload: CartridgeCreateRequest, request: Request):
+    """
+    Создает новый картридж с штрих-кодом
+    """
+    db = request.app.state.db
+    
+    # Валидация входных данных
+    if not payload.cartridge_name or not payload.cartridge_name.strip():
+        raise HTTPException(status_code=400, detail="Название картриджа не может быть пустым")
+    
+    # Проверка штрих-кода
+    if not payload.barcode or not payload.barcode.isdigit() or len(payload.barcode) != 13:
+        raise HTTPException(status_code=400, detail="Штрих-код должен состоять из 13 цифр")
+    
+    # Проверка минимума
+    if payload.min_qty < 1:
+        raise HTTPException(status_code=400, detail="Минимальный остаток должен быть не менее 1")
+    
+    # Проверка на дубль штрих-кода
+    if await barcode_exists(db, payload.barcode):
+        raise HTTPException(status_code=409, detail="Штрих-код уже существует в базе")
+    
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Получаем имя пользователя из сессии
+    session_id = request.cookies.get("session_id")
+    username = None
+    if session_id:
+        session_data = await get_session(db, session_id)
+        if session_data:
+            user_dn = session_data[0]
+            # Извлекаем имя пользователя из DN (например, "cn=username" -> "username")
+            if "cn=" in user_dn:
+                username = user_dn.split("cn=")[1].split(",")[0]
+            else:
+                username = user_dn
+    
+    try:
+        # Создаем картридж и добавляем первый штрих-код
+        cartridge_id = await create_cartridge(
+            db,
+            payload.cartridge_name.strip(),
+            max(0, payload.quantity),
+            payload.min_qty,
+            payload.barcode,
+            current_time
+        )
+        
+        # Записываем в историю (операция добавления - delta = quantity)
+        client_host = request.client.host
+        user_agent = request.headers.get("User-Agent")
+        os_info = "Platform: Windows       " if "Windows" in user_agent else "Platform: Mobile/Other  "
+        client_info = os_info + client_host
+        
+        if max(0, payload.quantity) > 0:
+            await add_history_record(
+                db,
+                cartridge_id,
+                payload.cartridge_name.strip(),
+                max(0, payload.quantity),
+                client_info,
+                current_time,
+                username
+            )
+        
+        await commit_changes(db)
+        
+        logger.info(f"{client_host} - 'Создан картридж ID: {cartridge_id} | Имя: {payload.cartridge_name} | Кол-во: {max(0, payload.quantity)}'")
+        
+        return {
+            "id": cartridge_id,
+            "message": "Картридж успешно создан"
+        }
+    
+    except Exception as e:
+        logger.error(f"Ошибка при создании картриджа: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.delete("/api/v1/cartridges/{cartridge_id}")
+async def api_delete_cartridge(cartridge_id: int, request: Request):
+    """
+    Удаляет картридж и все его штрих-коды из БД
+    История операций остается нетронутой
+    """
+    db = request.app.state.db
+    
+    # Проверяем, существует ли картридж
+    cartridge = await get_cartridge_by_id(db, cartridge_id)
+    if not cartridge:
+        raise HTTPException(status_code=404, detail="Картридж не найден")
+    
+    # Получаем имя картриджа перед удалением для логирования
+    cartridge_name = await get_cartridge_name(db, cartridge_id)
+    
+    try:
+        # Удаляем картридж и штрих-коды
+        success = await delete_cartridge(db, cartridge_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Картридж не найден")
+        
+        await commit_changes(db)
+        
+        client_host = request.client.host
+        logger.info(f"{client_host} - 'Удален картридж ID: {cartridge_id} | Имя: {cartridge_name}'")
+        
+        return {"message": "Картридж успешно удален"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении картриджа: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 
