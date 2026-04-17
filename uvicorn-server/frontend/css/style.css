@@ -227,6 +227,7 @@ h1 {
     margin: 0 0 18px;
     color: var(--muted);
     line-height: 1.5;
+    font-size: 16px;
 }
 
 .search-container {
@@ -837,10 +838,6 @@ details[open] .editor-card-summary::after {
     color: rgba(255, 255, 255, 0.76);
 }
 
-.form-group {
-    margin-bottom: 18px;
-}
-
 .form-group label {
     display: block;
     margin-bottom: 8px;
@@ -857,6 +854,7 @@ details[open] .editor-card-summary::after {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
     font-size: 1rem;
+    margin-bottom: 18px;
 }
 
 .login-form .form-group input:focus {
@@ -906,6 +904,7 @@ details[open] .editor-card-summary::after {
     border-radius: 12px;
     font-size: 1rem;
     font-weight: 700;
+    margin-top: 12px;
     cursor: pointer;
     transition: transform 0.2s ease, background 0.2s ease;
 }
@@ -1061,7 +1060,7 @@ details[open] .editor-card-summary::after {
 
 .send-now-group {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     margin-top: 16px;
 }
 
@@ -1165,7 +1164,7 @@ input[type="time"].form-control {
     flex-direction: column;
     gap: 20px;
     max-width: 600px;
-    padding: 30px;
+    padding: 0px;
     background-color: var(--surface-color);
     border-radius: 12px;
     border: 1px solid var(--border-color);
@@ -1175,12 +1174,13 @@ input[type="time"].form-control {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    
 }
 
 .form-group label {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .form-control {

@@ -46,7 +46,7 @@
         <main class="main-content">
             <section id="section-list" class="content-section active-section">
                 <div class="container">
-                    <h1>Список расходников</h1>
+                    <h1>Список позиций</h1>
                     <p class="page-intro">Раздел для отображения актуального количества по каждой позиции.<br>
                         Поиск по регулярке - можно вводить не полностью.</p>
                     <div class="search-container">
@@ -71,7 +71,7 @@
             <section id="section-add" class="content-section">
                 <div class="container">
                     <h1>Добавление позиций</h1>
-                    <p class="page-intro">Добавьте новый картридж в базу данных с минимальным количеством поля.</p>
+                    <p class="page-intro">Раздел для добавления новых позиций в базу.</p>
                     <div class="add-cartridge-form">
                         <div class="form-group">
                             <label for="addCartridgeName">Название картриджа:</label>
@@ -108,7 +108,7 @@
 
             <section id="section-post" class="content-section">
                 <div class="container">
-                    <h1>Почтовые смски</h1>
+                    <h1>Почтовые уведомления</h1>
                     <p class="page-intro">Управление email уведомлениями о низком запасе картриджей.</p>
                     
                     <!-- Настройки рассылки -->
@@ -168,7 +168,7 @@
                         </div>
                         
                         <div class="setting-group send-now-group">
-                            <button type="button" id="sendTestNotification" class="save-btn" onclick="sendTestNotification()">Отправить сейчас</button>
+                            <button type="button" id="sendTestNotification" class="save-btn" onclick="sendTestNotification()">Отправить принудительно</button>
                         </div>
                     </div>
                     
@@ -193,9 +193,8 @@
 
             <section id="section-analysis" class="content-section">
                 <div class="container">
-                    <h1>Анализ расходов</h1>
-                    <p class="page-intro">Тепловая карта показывает списания картриджей по месяцам. Учитываются только списания от ТСД и сайта.</p>
-
+                    <h1>График расходов</h1>
+                    <p class="page-intro">Тепловая карта отображает только списания по месяцам от ТСД и сайта.<br>Просьба - не дезинформировать сервак фантомными списаниями от тсдшника.<br>Например, списать и после этого сразу добавить, дабы проверить работает ли приложение на тсд. Оно работает.</p>
                     <div class="analysis-toolbar">
                         <label class="analysis-field">
                             <span>Год анализа</span>

@@ -58,7 +58,9 @@ from server_db import (
     get_setting,
     set_setting,
     get_notification_schedule,
-    set_notification_schedule
+    set_notification_schedule,
+    get_notifications_enabled,
+    set_notifications_enabled
 )
 
 from server_post import send_low_stock_notifications
@@ -118,6 +120,11 @@ async def check_notification_schedule_task():
             await asyncio.sleep(60)  # Проверяем каждую минуту
             
             async with aiosqlite.connect(DB_NAME) as db:
+                # Проверяем, включены ли уведомления глобально
+                enabled = await get_notifications_enabled(db)
+                if not enabled:
+                    continue  # Уведомления выключены
+                
                 schedule = await get_notification_schedule(db)
                 
                 if not schedule:
@@ -271,7 +278,7 @@ async def login(data: LoginRequest, request: Request):
     
     # Устанавливаем куку с session_id
     response = Response("Login successful")
-    response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=28800)  # 8 часов
+    response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=604800)  # 7 дней
     return response
 
 
@@ -728,6 +735,36 @@ async def set_notification_schedule_endpoint(schedule_data: NotificationSchedule
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Ошибка при установке расписания: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.get("/api/v1/notifications-enabled")
+async def get_notifications_enabled_endpoint(request: Request):
+    """
+    Получить статус глобальной настройки уведомлений
+    """
+    try:
+        async with aiosqlite.connect(DB_NAME) as db:
+            enabled = await get_notifications_enabled(db)
+            return {"enabled": enabled}
+    except Exception as e:
+        logger.error(f"Ошибка при получении статуса уведомлений: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@app.post("/api/v1/notifications-enabled")
+async def set_notifications_enabled_endpoint(enabled_data: dict, request: Request):
+    """
+    Установить статус глобальной настройки уведомлений
+    """
+    try:
+        enabled = enabled_data.get("enabled", False)
+        async with aiosqlite.connect(DB_NAME) as db:
+            await set_notifications_enabled(db, enabled)
+            await commit_changes(db)
+            return {"message": f"Уведомления {'включены' if enabled else 'выключены'}"}
+    except Exception as e:
+        logger.error(f"Ошибка при установке статуса уведомлений: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 

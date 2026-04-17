@@ -432,8 +432,34 @@ async function toggleNotifications() {
     const checkbox = document.getElementById('enableNotifications');
     if (!checkbox) return;
     
-    // Глобальная настройка рассылки пока не реализована
-    // В будущем здесь можно добавить логику включения/выключения автоматической рассылки
+    const enabled = checkbox.checked;
+    
+    try {
+        const response = await fetch('/api/v1/notifications-enabled', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled: enabled })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Ошибка при сохранении настройки уведомлений:', error);
+            alert('Ошибка: ' + (error.detail || 'Не удалось сохранить настройку.'));
+            // Возвращаем чекбокс в предыдущее состояние
+            checkbox.checked = !enabled;
+            return;
+        }
+        
+        const data = await response.json();
+        console.log(data.message);
+    } catch (error) {
+        console.error('Сетевая ошибка:', error);
+        alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');
+        // Возвращаем чекбокс в предыдущее состояние
+        checkbox.checked = !enabled;
+    }
 }
 
 /**
@@ -463,6 +489,16 @@ async function loadNotificationSettings() {
             
             if (timeInput && data.time_hm) {
                 timeInput.value = data.time_hm;
+            }
+        }
+        
+        // Загружаем статус глобальной настройки
+        const enabledResponse = await fetch('/api/v1/notifications-enabled');
+        if (enabledResponse.ok) {
+            const enabledData = await enabledResponse.json();
+            const enableCheckbox = document.getElementById('enableNotifications');
+            if (enableCheckbox) {
+                enableCheckbox.checked = enabledData.enabled;
             }
         }
     } catch (error) {

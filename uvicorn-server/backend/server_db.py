@@ -426,7 +426,7 @@ async def create_session(db: aiosqlite.Connection, user_dn: str) -> str:
         session_id: Уникальный ID сессии
     """
     session_id = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(hours=8)  # Сессия на 8 часов
+    expires_at = datetime.now() + timedelta(days=7)  # Сессия на 7 дней
     
     await db.execute(
         "INSERT INTO sessions (session_id, user_dn, expires_at) VALUES (?, ?, ?)",
@@ -685,6 +685,39 @@ async def set_notification_schedule(db: aiosqlite.Connection, days_of_week: str,
     await db.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
         ("notification_time", time_hm)
+    )
+
+
+async def get_notifications_enabled(db: aiosqlite.Connection) -> bool:
+    """
+    Получает статус глобальной настройки уведомлений
+    
+    Args:
+        db: Подключение к БД
+        
+    Returns:
+        True если уведомления включены, False иначе
+    """
+    cursor = await db.execute("SELECT value FROM settings WHERE key = 'notifications_enabled'")
+    row = await cursor.fetchone()
+    
+    if row:
+        return row[0].lower() == 'true'
+    
+    return False  # По умолчанию выключено
+
+
+async def set_notifications_enabled(db: aiosqlite.Connection, enabled: bool):
+    """
+    Устанавливает статус глобальной настройки уведомлений
+    
+    Args:
+        db: Подключение к БД
+        enabled: True для включения, False для выключения
+    """
+    await db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        ("notifications_enabled", str(enabled))
     )
 
 
