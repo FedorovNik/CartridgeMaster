@@ -29,7 +29,7 @@ function initializeAnalysisControls() {
  * Инициализирует раздел email уведомлений
  */
 function initializeEmailSection() {
-    // Загружаем список email при показе секции
+    // Загружаем список email и настройки уведомлений при показе секции
     const postSection = document.getElementById('section-post');
     if (postSection) {
         // Используем MutationObserver для отслеживания видимости секции
@@ -38,6 +38,7 @@ function initializeEmailSection() {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                     if (postSection.classList.contains('active-section')) {
                         loadEmailList();
+                        loadNotificationSettings();
                     }
                 }
             });

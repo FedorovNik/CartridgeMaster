@@ -444,11 +444,21 @@ async function loadNotificationSettings() {
         const response = await fetch('/api/v1/notification-schedule');
         if (response.ok) {
             const data = await response.json();
-            const daySelect = document.getElementById('notificationDay');
             const timeInput = document.getElementById('notificationTime');
             
-            if (daySelect && data.day_of_week !== null) {
-                daySelect.value = data.day_of_week;
+            // Сбрасываем все чек-боксы дней
+            for (let i = 0; i <= 6; i++) {
+                const checkbox = document.getElementById(`day-${i}`);
+                if (checkbox) checkbox.checked = false;
+            }
+            
+            // Если есть дни, отмечаем соответствующие чек-боксы
+            if (data.days_of_week) {
+                const days = data.days_of_week.split(',').map(d => parseInt(d.trim(), 10));
+                days.forEach(day => {
+                    const checkbox = document.getElementById(`day-${day}`);
+                    if (checkbox) checkbox.checked = true;
+                });
             }
             
             if (timeInput && data.time_hm) {
@@ -461,20 +471,34 @@ async function loadNotificationSettings() {
 }
 
 /**
- * Сохраняет день недели и время для уведомлений
+ * Сохраняет дни недели и время для уведомлений
  */
 async function saveNotificationSchedule() {
-    const daySelect = document.getElementById('notificationDay');
     const timeInput = document.getElementById('notificationTime');
     
-    if (!daySelect || !timeInput) return;
+    if (!timeInput) return;
     
-    const day = parseInt(daySelect.value, 10);
+    // Собираем выбранные дни
+    const selectedDays = [];
+    for (let i = 0; i <= 6; i++) {
+        const checkbox = document.getElementById(`day-${i}`);
+        if (checkbox && checkbox.checked) {
+            selectedDays.push(i);
+        }
+    }
+    
+    const daysString = selectedDays.join(',');
     const time = timeInput.value;
     
     // Проверяем, что время введено полностью (в формате ЧЧ:ММ)
     if (!time || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
         // Не показываем alert, просто игнорируем неполное время
+        return;
+    }
+    
+    // Проверяем, что выбран хотя бы один день
+    if (selectedDays.length === 0) {
+        alert('Выберите хотя бы один день недели для рассылки.');
         return;
     }
     
@@ -485,7 +509,7 @@ async function saveNotificationSchedule() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                day_of_week: day, 
+                days_of_week: daysString, 
                 time_hm: time 
             })
         });
@@ -497,7 +521,7 @@ async function saveNotificationSchedule() {
             return;
         }
         
-        alert('Расписание сохранено. Уведомления будут отправляться в ' + time);
+        alert('Расписание сохранено. Уведомления будут отправляться в ' + time + ' по выбранным дням.');
     } catch (error) {
         console.error('Сетевая ошибка:', error);
         alert('Ошибка сети. Проверьте подключение и попробуйте ещё раз.');

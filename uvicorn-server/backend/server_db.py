@@ -637,30 +637,30 @@ async def get_notification_schedule(db: aiosqlite.Connection):
         db: Подключение к БД
         
     Returns:
-        Словарь с полями: day_of_week (0-6), time_hm (ЧЧ:ММ) или None если не установлено
+        Словарь с полями: days_of_week (строка с днями через запятую), time_hm (ЧЧ:ММ) или None если не установлено
     """
-    day_cursor = await db.execute("SELECT value FROM settings WHERE key = 'notification_day'")
-    day_row = await day_cursor.fetchone()
+    days_cursor = await db.execute("SELECT value FROM settings WHERE key = 'notification_days'")
+    days_row = await days_cursor.fetchone()
     
     time_cursor = await db.execute("SELECT value FROM settings WHERE key = 'notification_time'")
     time_row = await time_cursor.fetchone()
     
-    if not day_row or not time_row:
+    if not days_row or not time_row:
         return None
     
     return {
-        "day_of_week": int(day_row[0]),
+        "days_of_week": days_row[0],
         "time_hm": time_row[0]
     }
 
 
-async def set_notification_schedule(db: aiosqlite.Connection, day_of_week: int, time_hm: str):
+async def set_notification_schedule(db: aiosqlite.Connection, days_of_week: str, time_hm: str):
     """
     Устанавливает расписание отправки уведомлений
     
     Args:
         db: Подключение к БД
-        day_of_week: День недели (0-6, подедельник=1)
+        days_of_week: Строка с днями недели через запятую (0-6)
         time_hm: Время в формате ЧЧ:ММ
     """
     import re
@@ -668,12 +668,19 @@ async def set_notification_schedule(db: aiosqlite.Connection, day_of_week: int, 
     if not re.match(r"^\d{2}:\d{2}$", time_hm):
         raise ValueError("Неверный формат времени. Используйте ЧЧ:ММ")
     
-    if not (0 <= day_of_week <= 6):
-        raise ValueError("День недели должен быть от 0 до 6")
+    # Проверка дней недели
+    if not days_of_week or days_of_week.strip() == '':
+        raise ValueError("Необходимо выбрать хотя бы один день недели")
+    
+    days = days_of_week.split(',')
+    for day_str in days:
+        day = int(day_str.strip())
+        if not (0 <= day <= 6):
+            raise ValueError("День недели должен быть от 0 до 6")
     
     await db.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-        ("notification_day", str(day_of_week))
+        ("notification_days", days_of_week)
     )
     await db.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",

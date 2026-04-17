@@ -122,16 +122,44 @@
                         </div>
                         
                         <div class="setting-group">
-                            <label for="notificationDay">День недели для рассылки:</label>
-                            <select id="notificationDay" class="form-control" onchange="saveNotificationSchedule()">
-                                <option value="1">Понедельник</option>
-                                <option value="2">Вторник</option>
-                                <option value="3">Среда</option>
-                                <option value="4">Четверг</option>
-                                <option value="5">Пятница</option>
-                                <option value="6">Суббота</option>
-                                <option value="0">Воскресенье</option>
-                            </select>
+                            <label>Дни недели для рассылки:</label>
+                            <div class="days-checkboxes">
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-1" value="1" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Пн
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-2" value="2" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Вт
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-3" value="3" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Ср
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-4" value="4" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Чт
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-5" value="5" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Пт
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-6" value="6" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Сб
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" id="day-0" value="0" onchange="saveNotificationSchedule()">
+                                    <span class="checkmark"></span>
+                                    Вс
+                                </label>
+                            </div>
                         </div>
                         
                         <div class="setting-group">
@@ -139,7 +167,9 @@
                             <input type="time" id="notificationTime" class="form-control" value="09:00" onblur="saveNotificationSchedule()">
                         </div>
                         
-                        <button type="button" id="sendTestNotification" class="save-btn" onclick="sendTestNotification()">Отправить сейчас</button>
+                        <div class="setting-group send-now-group">
+                            <button type="button" id="sendTestNotification" class="save-btn" onclick="sendTestNotification()">Отправить сейчас</button>
+                        </div>
                     </div>
                     
                     <!-- Список email адресов -->

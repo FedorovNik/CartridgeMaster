@@ -1029,6 +1029,42 @@ details[open] .editor-card-summary::after {
     accent-color: var(--primary);
 }
 
+.days-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.day-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+    background: var(--panel-soft);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    transition: all 0.2s ease;
+}
+
+.day-checkbox:hover {
+    background: var(--panel);
+    border-color: var(--primary-light);
+}
+
+.day-checkbox input[type="checkbox"] {
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+}
+
+.send-now-group {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
 .form-control {
     padding: 12px 16px;
     border: 1px solid var(--line);

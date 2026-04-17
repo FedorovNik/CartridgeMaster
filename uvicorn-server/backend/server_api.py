@@ -127,17 +127,25 @@ async def check_notification_schedule_task():
                 current_day = current_time.weekday()  # 0=Monday, 6=Sunday
                 current_time_hm = current_time.strftime("%H:%M")
                 
-                # Преобразуем day_of_week (1-7, где 1=Monday, 0=Sunday) в weekday (0-6)
-                schedule_day = schedule["day_of_week"]
-                if schedule_day == 0:  # Воскресенье (0 в нашей системе)
-                    schedule_day = 6
-                else:
-                    schedule_day = schedule_day - 1
+                # Получаем список дней из строки
+                days_str = schedule["days_of_week"]
+                if not days_str:
+                    continue
+                
+                schedule_days = [int(d.strip()) for d in days_str.split(',')]
+                
+                # Преобразуем дни в weekday формат (0=Monday, 6=Sunday)
+                converted_days = []
+                for day in schedule_days:
+                    if day == 0:  # Воскресенье (0 в нашей системе)
+                        converted_days.append(6)
+                    else:
+                        converted_days.append(day - 1)
                 
                 schedule_time = schedule["time_hm"]
                 
                 # Проверяем совпадение дня недели и времени
-                if current_day == schedule_day and current_time_hm == schedule_time:
+                if current_day in converted_days and current_time_hm == schedule_time:
                     # Проверяем, что уведомление не отправлялось сегодня
                     today_str = current_time.date().isoformat()
                     if last_sent_date != today_str:
@@ -684,7 +692,7 @@ async def update_setting(key: str, setting_data: SettingUpdateRequest, request: 
 ################################ API для расписания уведомлений ###################################################
 
 class NotificationScheduleRequest(BaseModel):
-    day_of_week: int
+    days_of_week: str
     time_hm: str
 
 
@@ -699,7 +707,7 @@ async def get_notification_schedule_endpoint(request: Request):
             if schedule:
                 return schedule
             else:
-                return {"day_of_week": None, "time_hm": None}
+                return {"days_of_week": None, "time_hm": None}
     except Exception as e:
         logger.error(f"Ошибка при получении расписания: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
@@ -712,7 +720,7 @@ async def set_notification_schedule_endpoint(schedule_data: NotificationSchedule
     """
     try:
         async with aiosqlite.connect(DB_NAME) as db:
-            await set_notification_schedule(db, schedule_data.day_of_week, schedule_data.time_hm)
+            await set_notification_schedule(db, schedule_data.days_of_week, schedule_data.time_hm)
             await commit_changes(db)
             return {"message": "Расписание уведомлений установлено"}
     except ValueError as e:
