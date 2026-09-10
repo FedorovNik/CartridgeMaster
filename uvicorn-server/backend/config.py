@@ -8,11 +8,11 @@ import os
 DB_NAME = os.getenv("DB_NAME", "inventory.db")
 
 # Ключ для ТСДшника
-AES_KEY = os.getenv("AES_KEY", "My_Secret_Key_16")
+AES_KEY = os.getenv("AES_KEY", "")
 
 # LDAP-конфигурация для аутентификации
 LDAP_SERVER = os.getenv("LDAP_SERVER", "")
-DOMAIN = os.getenv("DOMAIN", "NIZHBEL")
+DOMAIN = os.getenv("DOMAIN", "")
 SERVICE_USER = os.getenv("SERVICE_USER", "")
 SERVICE_PASSWORD = os.getenv("SERVICE_PASSWORD", "")
 LDAP_SEARCH_BASE = os.getenv("LDAP_SEARCH_BASE", "")

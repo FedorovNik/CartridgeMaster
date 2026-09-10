@@ -1,3 +1,7 @@
+{
+    default_sni {$SITE_ADDRESS}
+}
+
 # HTTP трафик пускаем на бек на 8080 порт, только если путь - /scan
 http://{$SITE_ADDRESS} {
     # Если путь совпадает с..
